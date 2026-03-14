@@ -647,7 +647,7 @@ Instructions:
                   </div>
                 </div>
 
-                {/* SMTP Settings */
+                {/* SMTP Settings */}
                 {(emailFormData.provider === 'smtp' || emailFormData.provider === 'brevo') && (
                   <>
                     <Separator />
@@ -692,7 +692,7 @@ Instructions:
                   </>
                 )}
 
-                {/* Brevo API Key */
+                {/* Brevo API Key */}
                 {emailFormData.provider === 'brevo' && (
                   <div className="space-y-2">
                     <Label>Clé API Brevo</Label>
@@ -705,7 +705,7 @@ Instructions:
                   </div>
                 )}
 
-                {/* Gmail OAuth */
+                {/* Gmail OAuth */}
                 {emailFormData.provider === 'gmail' && (
                   <>
                     <Separator />
