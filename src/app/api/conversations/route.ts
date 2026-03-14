@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Build SQL query
     let sql = `SELECT c.*, 
-               co.name as contactName, co.phone as contactPhone, co.tags as contactTags,
+               co.name as contactName, co.phone as contactPhone,
                u.name as assignedToName
                FROM conversations c
                LEFT JOIN contacts co ON c.contactId = co.id
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         id: row.contactId,
         name: row.contactName,
         phone: row.contactPhone,
-        tags: row.contactTags ? (typeof row.contactTags === 'string' ? JSON.parse(row.contactTags) : row.contactTags) : [],
+        tags: [], // Tags not available in this query
       },
       assignedTo: row.assignedToId ? { id: row.assignedToId, name: row.assignedToName } : null,
     }));

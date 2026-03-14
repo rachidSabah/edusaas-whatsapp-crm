@@ -40,7 +40,7 @@ interface Conversation {
     id: string;
     name: string | null;
     phone: string;
-    tags: string[];
+    tags?: string[];
   };
   messages?: Message[];
   _count?: {
@@ -212,7 +212,7 @@ export default function ConversationsPage() {
                           <Phone className="w-3 h-3 inline mr-1" />
                           {conversation.contact.phone}
                         </p>
-                        {conversation.contact.tags.length > 0 && (
+                        {conversation.contact.tags && conversation.contact.tags.length > 0 && (
                           <div className="flex gap-1 mt-1">
                             {conversation.contact.tags.slice(0, 2).map((tag) => (
                               <Badge key={tag} variant="outline" className="text-xs">
