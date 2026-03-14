@@ -95,8 +95,7 @@ const AI_CONFIG_TABLE_MIGRATION = [
       autoReplyCategories TEXT DEFAULT '["GENERAL", "SCHEDULE", "PRICING", "ENROLLMENT"]',
       maxResponseLength INTEGER DEFAULT 500,
       includeSignature INTEGER DEFAULT 1,
-      signatureText TEXT DEFAULT 'Cordialement,
-L''équipe administrative',
+      signatureText TEXT,
       createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
       updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(organizationId)
