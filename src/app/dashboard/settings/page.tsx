@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Settings, User, Building2, Bot, MessageSquare, Save, QrCode, 
   Send, Loader2, Sparkles, RefreshCw, CheckCircle, XCircle,
-  Upload, FileText, Trash2, Download, Clock
+  Upload, FileText, Trash2, Download, Clock, Mail, Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_MODELS, initPuter, isPuterLoaded, aiChat, getKV, setKV } from '@/lib/puter';
@@ -56,7 +57,31 @@ interface AISettings {
   systemPrompt: string;
 }
 
+interface EmailConfig {
+  id: string;
+  provider: string;
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpUser: string | null;
+  smtpPassword: string | null;
+  imapHost: string | null;
+  imapPort: number;
+  imapUser: string | null;
+  imapPassword: string | null;
+  brevoApiKey: string | null;
+  gmailClientId: string | null;
+  gmailClientSecret: string | null;
+  gmailRefreshToken: string | null;
+  fromEmail: string | null;
+  fromName: string | null;
+  isDefault: number;
+  isActive: number;
+}
+
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'organization';
+  
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,6 +118,31 @@ Instructions:
   const [puterReady, setPuterReady] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Email Settings
+  const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<EmailConfig | null>(null);
+  const [emailFormData, setEmailFormData] = useState({
+    provider: 'smtp',
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUser: '',
+    smtpPassword: '',
+    imapHost: '',
+    imapPort: 993,
+    imapUser: '',
+    imapPassword: '',
+    brevoApiKey: '',
+    gmailClientId: '',
+    gmailClientSecret: '',
+    gmailRefreshToken: '',
+    fromEmail: '',
+    fromName: '',
+    isDefault: true,
+    isActive: true,
+  });
+
   const fetchOrganization = async () => {
     try {
       const response = await fetch('/api/organizations');
@@ -128,6 +178,20 @@ Instructions:
     }
   };
 
+  // Fetch email configurations
+  const fetchEmailConfigs = async () => {
+    setEmailLoading(true);
+    try {
+      const response = await fetch('/api/email/config');
+      const data = await response.json();
+      setEmailConfigs(data.configs || []);
+    } catch (error) {
+      console.error('Error fetching email configs:', error);
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   // Initialize Puter.js
   useEffect(() => {
     const init = async () => {
@@ -145,6 +209,7 @@ Instructions:
     
     init();
     fetchOrganization();
+    fetchEmailConfigs();
   }, []);
 
   // Scroll chat to bottom
@@ -265,6 +330,100 @@ Instructions:
     }
   };
 
+  // Save email configuration
+  const handleSaveEmailConfig = async () => {
+    setEmailSaving(true);
+    try {
+      const payload = {
+        id: editingConfig?.id,
+        ...emailFormData,
+      };
+
+      const response = await fetch('/api/email/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'enregistrement');
+      }
+
+      alert(data.message || 'Configuration enregistrée avec succès!');
+      fetchEmailConfigs();
+      setEditingConfig(null);
+      setEmailFormData({
+        provider: 'smtp',
+        smtpHost: '',
+        smtpPort: 587,
+        smtpUser: '',
+        smtpPassword: '',
+        imapHost: '',
+        imapPort: 993,
+        imapUser: '',
+        imapPassword: '',
+        brevoApiKey: '',
+        gmailClientId: '',
+        gmailClientSecret: '',
+        gmailRefreshToken: '',
+        fromEmail: '',
+        fromName: '',
+        isDefault: true,
+        isActive: true,
+      });
+    } catch (error: any) {
+      console.error('Error saving email config:', error);
+      alert(error.message || 'Erreur lors de l\'enregistrement');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  // Delete email configuration
+  const handleDeleteEmailConfig = async (id: string) => {
+    if (!confirm('Supprimer cette configuration email?')) return;
+    
+    try {
+      const response = await fetch(`/api/email/config?id=${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la suppression');
+      }
+      
+      alert('Configuration supprimée avec succès!');
+      fetchEmailConfigs();
+    } catch (error: any) {
+      alert(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Edit existing config
+  const handleEditConfig = (config: EmailConfig) => {
+    setEditingConfig(config);
+    setEmailFormData({
+      provider: config.provider,
+      smtpHost: config.smtpHost || '',
+      smtpPort: config.smtpPort || 587,
+      smtpUser: config.smtpUser || '',
+      smtpPassword: '', // Don't prefill masked passwords
+      imapHost: config.imapHost || '',
+      imapPort: config.imapPort || 993,
+      imapUser: config.imapUser || '',
+      imapPassword: '',
+      brevoApiKey: '',
+      gmailClientId: config.gmailClientId || '',
+      gmailClientSecret: '',
+      gmailRefreshToken: '',
+      fromEmail: config.fromEmail || '',
+      fromName: config.fromName || '',
+      isDefault: config.isDefault === 1,
+      isActive: config.isActive === 1,
+    });
+  };
+
   const getPlanBadge = (plan: string) => {
     const colors: Record<string, string> = {
       starter: 'bg-slate-100 text-slate-700',
@@ -320,9 +479,10 @@ Instructions:
         </div>
       </div>
 
-      <Tabs defaultValue="organization" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue={defaultTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="organization">Organisation</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="ai">Intelligence Artificielle</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="account">Compte</TabsTrigger>
@@ -429,6 +589,315 @@ Instructions:
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Email Tab */}
+        <TabsContent value="email" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Email Configuration Form */}
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle>{editingConfig ? 'Modifier la configuration' : 'Nouvelle configuration email'}</CardTitle>
+                    <CardDescription>Configurez votre serveur email</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Provider Selection */}
+                <div className="space-y-2">
+                  <Label>Fournisseur</Label>
+                  <Select
+                    value={emailFormData.provider}
+                    onValueChange={(value) => setEmailFormData({ ...emailFormData, provider: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="smtp">SMTP / IMAP (Générique)</SelectItem>
+                      <SelectItem value="brevo">Brevo (Sendinblue)</SelectItem>
+                      <SelectItem value="gmail">Gmail (OAuth)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* From Settings */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email d'envoi *</Label>
+                    <Input
+                      type="email"
+                      value={emailFormData.fromEmail}
+                      onChange={(e) => setEmailFormData({ ...emailFormData, fromEmail: e.target.value })}
+                      placeholder="contact@ecole.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nom d'envoi</Label>
+                    <Input
+                      value={emailFormData.fromName}
+                      onChange={(e) => setEmailFormData({ ...emailFormData, fromName: e.target.value })}
+                      placeholder="Mon École"
+                    />
+                  </div>
+                </div>
+
+                {/* SMTP Settings */
+                {(emailFormData.provider === 'smtp' || emailFormData.provider === 'brevo') && (
+                  <>
+                    <Separator />
+                    <h4 className="font-medium text-sm text-slate-600">Configuration SMTP (Envoi)</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2 space-y-2">
+                        <Label>Serveur SMTP</Label>
+                        <Input
+                          value={emailFormData.smtpHost}
+                          onChange={(e) => setEmailFormData({ ...emailFormData, smtpHost: e.target.value })}
+                          placeholder="smtp.example.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Port</Label>
+                        <Input
+                          type="number"
+                          value={emailFormData.smtpPort}
+                          onChange={(e) => setEmailFormData({ ...emailFormData, smtpPort: parseInt(e.target.value) || 587 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Utilisateur</Label>
+                        <Input
+                          value={emailFormData.smtpUser}
+                          onChange={(e) => setEmailFormData({ ...emailFormData, smtpUser: e.target.value })}
+                          placeholder="user@example.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Mot de passe</Label>
+                        <Input
+                          type="password"
+                          value={emailFormData.smtpPassword}
+                          onChange={(e) => setEmailFormData({ ...emailFormData, smtpPassword: e.target.value })}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Brevo API Key */
+                {emailFormData.provider === 'brevo' && (
+                  <div className="space-y-2">
+                    <Label>Clé API Brevo</Label>
+                    <Input
+                      type="password"
+                      value={emailFormData.brevoApiKey}
+                      onChange={(e) => setEmailFormData({ ...emailFormData, brevoApiKey: e.target.value })}
+                      placeholder="xkeysib-..."
+                    />
+                  </div>
+                )}
+
+                {/* Gmail OAuth */
+                {emailFormData.provider === 'gmail' && (
+                  <>
+                    <Separator />
+                    <h4 className="font-medium text-sm text-slate-600">Configuration Gmail OAuth</h4>
+                    <div className="space-y-2">
+                      <Label>Client ID</Label>
+                      <Input
+                        value={emailFormData.gmailClientId}
+                        onChange={(e) => setEmailFormData({ ...emailFormData, gmailClientId: e.target.value })}
+                        placeholder="xxx.apps.googleusercontent.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Client Secret</Label>
+                      <Input
+                        type="password"
+                        value={emailFormData.gmailClientSecret}
+                        onChange={(e) => setEmailFormData({ ...emailFormData, gmailClientSecret: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Refresh Token</Label>
+                      <Input
+                        type="password"
+                        value={emailFormData.gmailRefreshToken}
+                        onChange={(e) => setEmailFormData({ ...emailFormData, gmailRefreshToken: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Status */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Configuration active</p>
+                    <p className="text-sm text-slate-500">Utiliser cette configuration pour l'envoi</p>
+                  </div>
+                  <Switch
+                    checked={emailFormData.isActive}
+                    onCheckedChange={(checked) => setEmailFormData({ ...emailFormData, isActive: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Par défaut</p>
+                    <p className="text-sm text-slate-500">Utiliser comme configuration principale</p>
+                  </div>
+                  <Switch
+                    checked={emailFormData.isDefault}
+                    onCheckedChange={(checked) => setEmailFormData({ ...emailFormData, isDefault: checked })}
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-4">
+                  {editingConfig && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingConfig(null);
+                        setEmailFormData({
+                          provider: 'smtp',
+                          smtpHost: '',
+                          smtpPort: 587,
+                          smtpUser: '',
+                          smtpPassword: '',
+                          imapHost: '',
+                          imapPort: 993,
+                          imapUser: '',
+                          imapPassword: '',
+                          brevoApiKey: '',
+                          gmailClientId: '',
+                          gmailClientSecret: '',
+                          gmailRefreshToken: '',
+                          fromEmail: '',
+                          fromName: '',
+                          isDefault: true,
+                          isActive: true,
+                        });
+                      }}
+                    >
+                      Annuler
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleSaveEmailConfig}
+                    disabled={emailSaving || !emailFormData.fromEmail}
+                    className="bg-gradient-to-r from-blue-500 to-blue-600"
+                  >
+                    {emailSaving ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enregistrement...</>
+                    ) : (
+                      <><Save className="w-4 h-4 mr-2" />Enregistrer</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Existing Configurations */}
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <CardTitle>Configurations existantes</CardTitle>
+                    <CardDescription>Gérez vos configurations email</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {emailLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                  </div>
+                ) : emailConfigs.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <Mail className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Aucune configuration email</p>
+                    <p className="text-sm">Créez votre première configuration ci-contre</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {emailConfigs.map((config) => (
+                      <div
+                        key={config.id}
+                        className="border rounded-lg p-4 hover:bg-slate-50 transition"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{config.fromName || config.fromEmail}</p>
+                              {config.isDefault === 1 && (
+                                <Badge className="bg-blue-100 text-blue-700">Par défaut</Badge>
+                              )}
+                              {config.isActive === 1 ? (
+                                <Badge className="bg-green-100 text-green-700">Actif</Badge>
+                              ) : (
+                                <Badge variant="outline">Inactif</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-500">{config.fromEmail}</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              Fournisseur: {config.provider.toUpperCase()}
+                              {config.smtpHost && ` • ${config.smtpHost}:${config.smtpPort}`}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditConfig(config)}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500"
+                              onClick={() => handleDeleteEmailConfig(config.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Email Info */}
+          <Card className="border-0 shadow-md bg-blue-50">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-blue-900">Configuration Email</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    <strong>SMTP:</strong> Pour l'envoi d'emails via votre serveur ou un service tiers.<br/>
+                    <strong>Brevo:</strong> Service d'envoi email français avec API simple.<br/>
+                    <strong>Gmail:</strong> Utilisez votre compte Gmail avec OAuth2.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* AI Tab */}

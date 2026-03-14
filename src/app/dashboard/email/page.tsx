@@ -523,11 +523,11 @@ export default function EmailClientPage() {
               variant="outline"
               onClick={() => {
                 setSettingsOpen(false);
-                window.location.href = '/dashboard/settings';
+                window.location.href = '/dashboard/settings?tab=email';
               }}
             >
               <Settings className="w-4 h-4 mr-2" />
-              Accéder aux paramètres
+              Accéder aux paramètres Email
             </Button>
           </div>
         </DialogContent>
