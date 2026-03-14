@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "pages:build": "npx @cloudflare/next-on-pages"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20260310.1",
