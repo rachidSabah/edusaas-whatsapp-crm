@@ -7,6 +7,21 @@ import { tursoExecute, tursoQuery, type CloudflareEnv } from '@/lib/turso-http';
 // System templates in French
 const SYSTEM_TEMPLATES = [
   {
+    id: 'tpl_general_001',
+    name: 'Message général',
+    category: 'GENERAL',
+    content: `Chers parents,
+
+{Message}
+
+Nous restons à votre disposition pour toute information complémentaire.
+
+Cordialement,`,
+    triggerAction: 'GENERAL',
+    signature: 'Administration {organisation}',
+    variables: '["Message", "organisation"]'
+  },
+  {
     id: 'tpl_absence_001',
     name: 'Notification d\'absence',
     category: 'ABSENCE_NOTIFICATION',

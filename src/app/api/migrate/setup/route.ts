@@ -82,6 +82,94 @@ const WHATSAPP_TABLES_MIGRATION = [
   ` },
 ];
 
+// System templates to seed
+const SYSTEM_TEMPLATES = [
+  {
+    id: 'tpl_general_001',
+    name: 'Message général',
+    category: 'GENERAL',
+    content: `Chers parents,
+
+{Message}
+
+Nous restons à votre disposition pour toute information complémentaire.
+
+Cordialement,`,
+    triggerAction: 'GENERAL',
+    signature: 'Administration',
+    variables: '["Message"]'
+  },
+  {
+    id: 'tpl_absence_001',
+    name: "Notification d'absence",
+    category: 'ABSENCE_NOTIFICATION',
+    content: `Chers parents,
+
+Nous vous informons que votre enfant {StudentName}, élève du groupe {GroupName}, a été marqué(e) absent(e) ce jour, {Date}.
+
+Nous vous prions de bien vouloir justifier cette absence en contactant l'administration dans les plus brefs délais.
+
+Pour toute information complémentaire, n'hésitez pas à nous contacter.
+
+Cordialement,`,
+    triggerAction: 'ABSENT',
+    signature: 'Administration',
+    variables: '["StudentName", "GroupName", "Date"]'
+  },
+  {
+    id: 'tpl_retard_001',
+    name: 'Notification de retard',
+    category: 'LATE_NOTIFICATION',
+    content: `Chers parents,
+
+Nous vous informons que votre enfant {StudentName}, élève du groupe {GroupName}, est arrivé(e) en retard le {Date} à {Time}.
+
+Nous vous rappelons que la ponctualité est essentielle pour le bon déroulement des cours et le respect des autres élèves.
+
+Nous vous prions de veiller à ce que votre enfant arrive à l'heure pour les prochaines séances.
+
+Cordialement,`,
+    triggerAction: 'LATE',
+    signature: 'Administration',
+    variables: '["StudentName", "GroupName", "Date", "Time"]'
+  },
+  {
+    id: 'tpl_payment_001',
+    name: 'Rappel de paiement',
+    category: 'PAYMENT_REMINDER',
+    content: `Chers parents,
+
+Nous vous rappelons que le paiement concernant {StudentName} pour le mois de {Month} n'a pas encore été effectué.
+
+Montant dû : {Amount} MAD
+Date limite : {DueDate}
+
+Nous vous prions de régulariser cette situation dans les plus brefs délais.
+
+Pour toute question relative au paiement, veuillez contacter l'administration.
+
+Cordialement,`,
+    triggerAction: 'PAYMENT_DELAY',
+    signature: 'Administration',
+    variables: '["StudentName", "Month", "Amount", "DueDate"]'
+  },
+  {
+    id: 'tpl_admin_001',
+    name: 'Communication administrative',
+    category: 'ADMIN_COMMUNICATION',
+    content: `Chers parents,
+
+{Message}
+
+Nous restons à votre disposition pour toute information complémentaire.
+
+Cordialement,`,
+    triggerAction: 'ADMIN_COMMUNICATION',
+    signature: 'Administration',
+    variables: '["Message"]'
+  }
+];
+
 export async function GET(request: NextRequest) {
   try {
     const { dbUrl, dbToken } = getCredentials();
@@ -229,6 +317,32 @@ export async function POST(request: NextRequest) {
         } else {
           results.push({ type: 'table', name: migration.name, status: 'error', error: error.message });
         }
+      }
+    }
+
+    // Seed system templates
+    const now = new Date().toISOString();
+    for (const template of SYSTEM_TEMPLATES) {
+      try {
+        // Check if template exists
+        const existing = await tursoQuery(dbUrl, dbToken,
+          `SELECT id FROM templates WHERE id = ?`,
+          [template.id]
+        );
+
+        if (existing.length === 0) {
+          // Insert new template
+          await tursoExecute(dbUrl, dbToken,
+            `INSERT INTO templates (id, organizationId, name, category, content, triggerAction, signature, variables, isSystem, isActive, createdAt, updatedAt)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`,
+            [template.id, template.name, template.category, template.content, template.triggerAction, template.signature, template.variables, now, now]
+          );
+          results.push({ type: 'template', name: template.name, status: 'created' });
+        } else {
+          results.push({ type: 'template', name: template.name, status: 'exists' });
+        }
+      } catch (error: any) {
+        results.push({ type: 'template', name: template.name, status: 'error', error: error.message });
       }
     }
 

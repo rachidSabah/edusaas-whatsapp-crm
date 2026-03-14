@@ -99,17 +99,20 @@ export default function AnalyticsPage() {
     );
   }
 
+  // If data is null, use default values (should not happen as API always returns data)
   if (!data) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Analytiques</h1>
-          <p className="text-slate-600">Aucune donnée disponible</p>
+          <p className="text-slate-600">Erreur lors du chargement des données. Veuillez rafraîchir la page.</p>
         </div>
       </div>
     );
   }
 
+  // Always show the analytics dashboard, even with zeros
+  // Data is guaranteed to exist from API
   const stats = data.overview;
   const percentageChange = (current: number, previous: number) => {
     if (previous === 0) return 0;

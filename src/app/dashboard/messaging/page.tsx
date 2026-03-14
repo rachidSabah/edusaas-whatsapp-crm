@@ -100,8 +100,16 @@ export default function MessagingPage() {
     try {
       const response = await fetch('/api/templates');
       const data = await response.json();
+      // Include all relevant template categories for messaging
+      const relevantCategories = [
+        'PAYMENT_REMINDER', 
+        'ADMIN_COMMUNICATION', 
+        'GENERAL',
+        'ABSENCE_NOTIFICATION',
+        'LATE_NOTIFICATION'
+      ];
       setTemplates((data.templates || []).filter((t: Template) => 
-        t.category === 'PAYMENT_REMINDER' || t.category === 'ADMIN_COMMUNICATION' || t.category === 'GENERAL'
+        relevantCategories.includes(t.category)
       ));
     } catch (error) {
       console.error('Error fetching templates:', error);

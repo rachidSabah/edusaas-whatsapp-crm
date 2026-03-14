@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ interface SetupStatus {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
@@ -408,15 +410,27 @@ export default function DashboardPage() {
               <CardTitle>Actions rapides</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/dashboard/students')}
+              >
                 <GraduationCap className="w-4 h-4 mr-2" />
                 Ajouter un étudiant
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/dashboard/attendance')}
+              >
                 <Calendar className="w-4 h-4 mr-2" />
                 Marquer les présences
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => router.push('/dashboard/knowledge-base')}
+              >
                 <BookOpen className="w-4 h-4 mr-2" />
                 Ajouter à la base de connaissances
               </Button>
