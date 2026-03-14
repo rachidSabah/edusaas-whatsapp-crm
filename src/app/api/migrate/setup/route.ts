@@ -82,6 +82,28 @@ const WHATSAPP_TABLES_MIGRATION = [
   ` },
 ];
 
+const AI_CONFIG_TABLE_MIGRATION = [
+  { name: 'ai_config', sql: `
+    CREATE TABLE IF NOT EXISTS ai_config (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      systemInstructions TEXT,
+      responseTone TEXT DEFAULT 'professional',
+      language TEXT DEFAULT 'auto',
+      knowledgeBaseEnabled INTEGER DEFAULT 1,
+      autoReplyEnabled INTEGER DEFAULT 1,
+      autoReplyCategories TEXT DEFAULT '["GENERAL", "SCHEDULE", "PRICING", "ENROLLMENT"]',
+      maxResponseLength INTEGER DEFAULT 500,
+      includeSignature INTEGER DEFAULT 1,
+      signatureText TEXT DEFAULT 'Cordialement,
+L''équipe administrative',
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(organizationId)
+    )
+  ` },
+];
+
 // System templates to seed
 const SYSTEM_TEMPLATES = [
   {
@@ -237,6 +259,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Check ai_config table
+    for (const table of AI_CONFIG_TABLE_MIGRATION) {
+      try {
+        await tursoQuery(dbUrl, dbToken, `SELECT id FROM ${table.name} LIMIT 1`);
+        tablesStatus.push({ name: table.name, exists: true });
+      } catch {
+        tablesStatus.push({ name: table.name, exists: false });
+      }
+    }
+
     return NextResponse.json({
       parentColumns: parentColumnsStatus,
       organizationsColumns: orgColumnsStatus,
@@ -308,6 +340,20 @@ export async function POST(request: NextRequest) {
 
     // Run whatsapp tables migration
     for (const migration of WHATSAPP_TABLES_MIGRATION) {
+      try {
+        await tursoExecute(dbUrl, dbToken, migration.sql);
+        results.push({ type: 'table', name: migration.name, status: 'created' });
+      } catch (error: any) {
+        if (error.message?.includes('already exists') || error.message?.includes('table')) {
+          results.push({ type: 'table', name: migration.name, status: 'exists' });
+        } else {
+          results.push({ type: 'table', name: migration.name, status: 'error', error: error.message });
+        }
+      }
+    }
+
+    // Run ai_config table migration
+    for (const migration of AI_CONFIG_TABLE_MIGRATION) {
       try {
         await tursoExecute(dbUrl, dbToken, migration.sql);
         results.push({ type: 'table', name: migration.name, status: 'created' });
