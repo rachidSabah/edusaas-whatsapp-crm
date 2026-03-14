@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -78,7 +78,7 @@ interface EmailConfig {
   isActive: number;
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get('tab') || 'organization';
   
@@ -1215,5 +1215,18 @@ Instructions:
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Wrapper component with Suspense for useSearchParams
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+      </div>
+    }>
+      <SettingsPageContent />
+    </Suspense>
   );
 }

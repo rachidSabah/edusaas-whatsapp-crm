@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +84,7 @@ const FOLDER_ICONS: Record<string, any> = {
 };
 
 export default function EmailClientPage() {
+  const router = useRouter();
   const [folders, setFolders] = useState<EmailFolder[]>([]);
   const [emails, setEmails] = useState<EmailMessage[]>([]);
   const [selectedFolder, setSelectedFolder] = useState('inbox');
@@ -523,7 +525,7 @@ export default function EmailClientPage() {
               variant="outline"
               onClick={() => {
                 setSettingsOpen(false);
-                window.location.href = '/dashboard/settings?tab=email';
+                router.push('/dashboard/settings?tab=email');
               }}
             >
               <Settings className="w-4 h-4 mr-2" />
