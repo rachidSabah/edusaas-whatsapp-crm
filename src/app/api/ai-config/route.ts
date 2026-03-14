@@ -21,6 +21,37 @@ interface AIConfigRecord {
   updatedAt: string;
 }
 
+// SQL to create ai_config table if it doesn't exist
+const CREATE_AI_CONFIG_TABLE = `
+  CREATE TABLE IF NOT EXISTS ai_config (
+    id TEXT PRIMARY KEY,
+    organizationId TEXT NOT NULL,
+    systemInstructions TEXT,
+    responseTone TEXT DEFAULT 'professional',
+    language TEXT DEFAULT 'auto',
+    knowledgeBaseEnabled INTEGER DEFAULT 1,
+    autoReplyEnabled INTEGER DEFAULT 1,
+    autoReplyCategories TEXT DEFAULT '["GENERAL", "SCHEDULE", "PRICING", "ENROLLMENT"]',
+    maxResponseLength INTEGER DEFAULT 500,
+    includeSignature INTEGER DEFAULT 1,
+    signatureText TEXT DEFAULT 'Cordialement,
+L''équipe administrative',
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(organizationId)
+  )
+`;
+
+// Helper function to ensure ai_config table exists
+async function ensureTableExists(db: ReturnType<typeof getDbContext>) {
+  try {
+    await db.execute(CREATE_AI_CONFIG_TABLE);
+  } catch (error) {
+    console.error('Error creating ai_config table:', error);
+    // Table might already exist, ignore error
+  }
+}
+
 // Get AI configuration for organization
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +64,9 @@ export async function GET(request: NextRequest) {
         message: 'Aucune organisation associée. Configuration par défaut utilisée.',
       });
     }
+
+    // Ensure table exists
+    await ensureTableExists(db);
 
     // Try to get existing config
     const configs = await db.query<AIConfigRecord>(
@@ -89,6 +123,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Ensure table exists
+    await ensureTableExists(db);
 
     const body = await request.json() as Partial<AIConfig>;
     const config = body;
