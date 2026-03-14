@@ -80,7 +80,16 @@ interface EmailConfig {
 
 function SettingsPageContent() {
   const searchParams = useSearchParams();
-  const defaultTab = searchParams.get('tab') || 'organization';
+  const tabFromUrl = searchParams.get('tab') || 'organization';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  
+  // Update tab when URL changes
+  useEffect(() => {
+    const newTab = searchParams.get('tab');
+    if (newTab && newTab !== activeTab) {
+      setActiveTab(newTab);
+    }
+  }, [searchParams, activeTab]);
   
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -479,7 +488,7 @@ Instructions:
         </div>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="organization">Organisation</TabsTrigger>
           <TabsTrigger value="email">Email</TabsTrigger>
