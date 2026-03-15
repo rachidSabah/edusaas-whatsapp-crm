@@ -2,7 +2,7 @@
 // Provides unified access to database credentials and common operations
 
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { tursoExecute, tursoQuery, parseTursoResult, type CloudflareEnv } from './turso-http';
+import { tursoExecute, tursoQuery, parseTursoResult, getDbCredentials as getFallbackCredentials, getJwtSecret, type CloudflareEnv } from './turso-http';
 
 export interface DbContext {
   dbUrl: string;
@@ -15,19 +15,20 @@ export interface DbContext {
 }
 
 /**
- * Get database context from Cloudflare environment
+ * Get database context from Cloudflare environment with fallback support
  */
 export function getDbContext(): DbContext {
-  const ctx = getRequestContext();
-  const env = ctx.env as CloudflareEnv;
+  let env: CloudflareEnv | null = null;
   
-  const dbUrl = env.TURSO_DATABASE_URL;
-  const dbToken = env.TURSO_AUTH_TOKEN;
-  const jwtSecret = env.JWT_SECRET || 'edusaas-production-jwt-secret-super-secure-2024-key';
-  
-  if (!dbUrl || !dbToken) {
-    throw new Error('Missing database configuration in Cloudflare environment');
+  try {
+    const ctx = getRequestContext();
+    env = ctx.env as CloudflareEnv;
+  } catch {
+    // Not in Cloudflare context, will use fallback
   }
+  
+  const { url: dbUrl, token: dbToken } = getFallbackCredentials(env);
+  const jwtSecret = getJwtSecret(env);
   
   return {
     dbUrl,
@@ -47,14 +48,22 @@ export function getDbContext(): DbContext {
 }
 
 /**
- * Get raw database credentials
+ * Get raw database credentials with fallback support
  */
 export function getDbCredentials(): { dbUrl: string; dbToken: string } {
-  const ctx = getRequestContext();
-  const env = ctx.env as CloudflareEnv;
+  let env: CloudflareEnv | null = null;
+  
+  try {
+    const ctx = getRequestContext();
+    env = ctx.env as CloudflareEnv;
+  } catch {
+    // Not in Cloudflare context
+  }
+  
+  const { url, token } = getFallbackCredentials(env);
   
   return {
-    dbUrl: env.TURSO_DATABASE_URL,
-    dbToken: env.TURSO_AUTH_TOKEN,
+    dbUrl: url,
+    dbToken: token,
   };
 }
