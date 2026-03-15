@@ -46,7 +46,9 @@ import {
   Search,
   Download,
   FileText,
+  CheckCircle,
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -114,6 +116,7 @@ export default function AssignmentsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -127,19 +130,25 @@ export default function AssignmentsPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setMessage(null);
     try {
       const [tasksRes, usersRes] = await Promise.all([
         fetch('/api/tasks?created=true'),
         fetch('/api/admin/users')
       ]);
 
-      const tasksData = await tasksRes.json() as { tasks: Task[] };
-      const usersData = await usersRes.json() as { users: User[] };
+      const tasksData = await tasksRes.json() as { tasks: Task[]; error?: string };
+      const usersData = await usersRes.json() as { users: User[]; error?: string };
+
+      if (!tasksRes.ok) {
+        setMessage({ type: 'error', text: tasksData.error || 'Erreur lors du chargement des tâches' });
+      }
 
       setTasks(tasksData.tasks || []);
       setUsers(usersData.users || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
     } finally {
       setLoading(false);
     }
@@ -152,8 +161,8 @@ export default function AssignmentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setMessage(null);
     try {
-      const url = editingTask ? '/api/tasks' : '/api/tasks';
       const method = editingTask ? 'PUT' : 'POST';
 
       let attachmentsData: string[] = [];
@@ -172,11 +181,13 @@ export default function AssignmentsPage() {
         attachments: attachmentsData.length > 0 ? attachmentsData : null,
       };
 
-      const response = await fetch(url, {
+      const response = await fetch('/api/tasks', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+
+      const data = await response.json();
 
       if (response.ok) {
         setDialogOpen(false);
@@ -190,14 +201,14 @@ export default function AssignmentsPage() {
           priority: 'MEDIUM',
           attachments: [],
         });
-        fetchData();
+        setMessage({ type: 'success', text: editingTask ? 'Tâche modifiée avec succès' : 'Tâche créée avec succès' });
+        await fetchData();
       } else {
-        const data = await response.json() as { error?: string };
-        alert(data.error || 'Erreur lors de la sauvegarde');
+        setMessage({ type: 'error', text: data.error || 'Erreur lors de la sauvegarde' });
       }
     } catch (error) {
       console.error('Save error:', error);
-      alert('Erreur lors de la sauvegarde');
+      setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
     } finally {
       setSaving(false);
     }
@@ -421,6 +432,15 @@ export default function AssignmentsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Message Alert */}
+      {message && (
+        <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={message.type === 'success' ? 'border-green-500 bg-green-50' : ''}>
+          {message.type === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4" />}
+          <AlertTitle>{message.type === 'success' ? 'Succès' : 'Erreur'}</AlertTitle>
+          <AlertDescription>{message.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

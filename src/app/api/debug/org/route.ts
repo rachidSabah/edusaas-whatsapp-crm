@@ -1,38 +1,52 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getRequestContext } from '@cloudflare/next-on-pages';
-import { tursoQuery, tursoExecute, type CloudflareEnv } from '@/lib/turso-http';
+import { tursoQuery, tursoExecute, getDbCredentials, type CloudflareEnv } from '@/lib/turso-http';
 
 // No auth required - for debugging only
 export async function GET(request: NextRequest) {
   try {
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
+    // Get Cloudflare env with fallback support
+    let env: CloudflareEnv | null = null;
+    try {
+      const { getRequestContext } = await import('@cloudflare/next-on-pages');
+      const ctx = getRequestContext();
+      env = ctx.env as CloudflareEnv;
+    } catch {
+      // Not in Cloudflare context
+    }
     
-    const dbUrl = env.TURSO_DATABASE_URL;
-    const dbToken = env.TURSO_AUTH_TOKEN;
+    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
 
     if (!dbUrl || !dbToken) {
-      return NextResponse.json({ error: 'DB credentials not set' }, { status: 500 });
+      return NextResponse.json({ error: 'DB credentials not available' }, { status: 500 });
     }
 
     // Get all organizations
-    const orgs = await tursoQuery(dbUrl, dbToken, `SELECT * FROM organizations`);
+    const orgs = await tursoQuery(dbUrl, dbToken, `SELECT * FROM organizations`, []);
     
     // Get all users with phone
-    const users = await tursoQuery(dbUrl, dbToken, `SELECT id, email, name, role, organizationId, phone FROM users`);
+    const users = await tursoQuery(dbUrl, dbToken, `SELECT id, email, name, role, organizationId, phone, isActive FROM users`, []);
 
     // Get all teachers
-    const teachers = await tursoQuery(dbUrl, dbToken, `SELECT * FROM teachers`);
+    const teachers = await tursoQuery(dbUrl, dbToken, `SELECT * FROM teachers`, []);
+
+    // Get all tasks
+    const tasks = await tursoQuery(dbUrl, dbToken, `SELECT * FROM tasks`, []);
 
     return NextResponse.json({
+      database: {
+        url: dbUrl.substring(0, 30) + '...',
+        hasToken: !!dbToken,
+      },
       organizations: orgs,
       organizationsCount: orgs.length,
       users: users,
       usersCount: users.length,
       teachers: teachers,
       teachersCount: teachers.length,
+      tasks: tasks,
+      tasksCount: tasks.length,
     });
   } catch (error: any) {
     return NextResponse.json({
@@ -44,11 +58,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
+    let env: CloudflareEnv | null = null;
+    try {
+      const { getRequestContext } = await import('@cloudflare/next-on-pages');
+      const ctx = getRequestContext();
+      env = ctx.env as CloudflareEnv;
+    } catch {
+      // Not in Cloudflare context
+    }
     
-    const dbUrl = env.TURSO_DATABASE_URL;
-    const dbToken = env.TURSO_AUTH_TOKEN;
+    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
     const body = await request.json();
     
     const { name, email, phone, address, city, country, userId } = body;
@@ -90,11 +109,16 @@ export async function POST(request: NextRequest) {
 // Update organization
 export async function PUT(request: NextRequest) {
   try {
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
+    let env: CloudflareEnv | null = null;
+    try {
+      const { getRequestContext } = await import('@cloudflare/next-on-pages');
+      const ctx = getRequestContext();
+      env = ctx.env as CloudflareEnv;
+    } catch {
+      // Not in Cloudflare context
+    }
     
-    const dbUrl = env.TURSO_DATABASE_URL;
-    const dbToken = env.TURSO_AUTH_TOKEN;
+    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
     const body = await request.json();
     
     const { id, name, email, phone, address, city, country } = body;

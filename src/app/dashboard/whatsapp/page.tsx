@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   MessageSquare, 
   Plus, 
@@ -41,8 +42,16 @@ import {
   ArrowLeft,
   ArrowRight,
   RotateCcw,
+  QrCode,
+  Loader2,
+  AlertCircle,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// WhatsApp Service URL
+const WHATSAPP_SERVICE_URL = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3030';
 
 interface WhatsAppAccount {
   id: string;
@@ -64,6 +73,12 @@ interface EmbeddedBrowserState {
   message: string;
 }
 
+interface WhatsAppConnectionStatus {
+  status: 'connecting' | 'connected' | 'disconnected';
+  qrCode?: string;
+  phone?: string;
+}
+
 export default function WhatsAppPage() {
   const [accounts, setAccounts] = useState<WhatsAppAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +87,13 @@ export default function WhatsAppPage() {
     phoneNumber: '',
     accountName: '',
   });
+  
+  // Baileys connection state
+  const [connectionStatus, setConnectionStatus] = useState<WhatsAppConnectionStatus>({
+    status: 'disconnected'
+  });
+  const [connecting, setConnecting] = useState(false);
+  const [qrPolling, setQrPolling] = useState<NodeJS.Timeout | null>(null);
   
   // Embedded browser state
   const [browser, setBrowser] = useState<EmbeddedBrowserState>({
@@ -97,6 +119,104 @@ export default function WhatsAppPage() {
       setLoading(false);
     }
   };
+
+  // Fetch Baileys connection status
+  const fetchConnectionStatus = async () => {
+    try {
+      // Get the current user's organization ID from the session
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      if (!sessionData.user?.organizationId) {
+        return;
+      }
+
+      const response = await fetch(`${WHATSAPP_SERVICE_URL}/status?organizationId=${sessionData.user.organizationId}&XTransformPort=3030`);
+      if (response.ok) {
+        const data = await response.json();
+        setConnectionStatus({
+          status: data.status,
+          qrCode: data.qrCode,
+          phone: data.phone,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching connection status:', error);
+    }
+  };
+
+  // Connect to WhatsApp via Baileys
+  const handleBaileysConnect = async () => {
+    setConnecting(true);
+    try {
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      if (!sessionData.user?.organizationId) {
+        alert('Vous devez être connecté à une organisation');
+        setConnecting(false);
+        return;
+      }
+
+      const response = await fetch(`${WHATSAPP_SERVICE_URL}/connect?XTransformPort=3030`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: sessionData.user.organizationId }),
+      });
+
+      if (response.ok) {
+        // Start polling for QR code
+        const pollInterval = setInterval(async () => {
+          await fetchConnectionStatus();
+        }, 2000);
+        
+        setQrPolling(pollInterval);
+      }
+    } catch (error) {
+      console.error('Error connecting:', error);
+    }
+  };
+
+  // Disconnect from WhatsApp
+  const handleBaileysDisconnect = async () => {
+    try {
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      if (qrPolling) {
+        clearInterval(qrPolling);
+        setQrPolling(null);
+      }
+
+      await fetch(`${WHATSAPP_SERVICE_URL}/disconnect?XTransformPort=3030`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: sessionData.user?.organizationId }),
+      });
+
+      setConnectionStatus({ status: 'disconnected' });
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+    }
+  };
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (qrPolling) {
+        clearInterval(qrPolling);
+      }
+    };
+  }, [qrPolling]);
+
+  // Stop polling when connected
+  useEffect(() => {
+    if (connectionStatus.status === 'connected' && qrPolling) {
+      clearInterval(qrPolling);
+      setQrPolling(null);
+      setConnecting(false);
+    }
+  }, [connectionStatus.status, qrPolling]);
 
   useEffect(() => {
     fetchAccounts();
