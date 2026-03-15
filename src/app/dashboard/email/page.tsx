@@ -510,24 +510,30 @@ export default function EmailClientPage() {
 
       {/* Settings Dialog */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Configuration Email</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-slate-600">
-              Configurez vos paramètres email sur la page de configuration dédiée.
+            <p className="text-slate-600 mb-4">
+              Configurez vos comptes email, serveurs SMTP/IMAP et fournisseurs sur la page de configuration dédiée.
             </p>
+            <div className="space-y-2 text-sm text-slate-500">
+              <p>• Serveurs SMTP personnalisés</p>
+              <p>• Brevo (Sendinblue)</p>
+              <p>• Mailchimp Transactional</p>
+              <p>• Gmail via OAuth2</p>
+              <p>• Microsoft 365 / Exchange</p>
+            </div>
             <Button 
-              className="mt-4" 
-              variant="outline"
+              className="mt-4 w-full" 
               onClick={() => {
                 setSettingsOpen(false);
-                window.location.href = '/dashboard/settings';
+                window.location.href = '/dashboard/email/settings';
               }}
             >
               <Settings className="w-4 h-4 mr-2" />
-              Accéder aux paramètres
+              Ouvrir la configuration
             </Button>
           </div>
         </DialogContent>
