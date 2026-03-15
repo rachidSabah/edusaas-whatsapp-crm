@@ -6,6 +6,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { tursoQuery, getDbCredentials, getJwtSecret, type CloudflareEnv } from './turso-http';
+import { getLocalUserByEmail, getLocalUserById, updateLocalUserLastLogin, shouldUseLocalDb } from './local-db';
 
 export interface JWTPayload {
   userId: string;
@@ -78,46 +79,19 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    // Get Cloudflare environment with fallback
-    let env: CloudflareEnv | null = null;
-    try {
-      const ctx = getRequestContext();
-      env = ctx.env as CloudflareEnv;
-    } catch {
-      // Not in Cloudflare context, use fallback
-    }
-
-    // Get database credentials with fallback support
-    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
-
-    // Query user from database
-    const users = await tursoQuery<{ 
-      id: string; 
-      email: string; 
-      name: string; 
-      role: string; 
-      organizationId: string | null;
-      avatar: string | null;
-      isActive: number;
-    }>(
-      dbUrl,
-      dbToken,
-      `SELECT id, email, name, role, organizationId, avatar, isActive FROM users WHERE id = ?`,
-      [payload.userId]
-    );
-
-    const user = users[0];
-    if (!user || user.isActive !== 1) {
+    // Use local database fallback
+    const localUser = getLocalUserById(payload.userId);
+    if (!localUser || localUser.isActive !== 1) {
       return null;
     }
 
     return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      organizationId: user.organizationId,
-      avatar: user.avatar,
+      id: localUser.id,
+      email: localUser.email,
+      name: localUser.name,
+      role: localUser.role,
+      organizationId: localUser.organizationId,
+      avatar: localUser.avatar,
     };
   } catch (error) {
     console.error('getCurrentUser error:', error);
@@ -214,33 +188,19 @@ export async function authenticateUser(
   dbUrl: string,
   dbToken: string
 ): Promise<{ user: AuthUser; token: string } | null> {
-  const users = await tursoQuery<{ 
-    id: string; 
-    email: string; 
-    password: string;
-    name: string; 
-    role: string; 
-    organizationId: string | null;
-    avatar: string | null;
-    isActive: number;
-  }>(
-    dbUrl,
-    dbToken,
-    `SELECT id, email, password, name, role, organizationId, avatar, isActive FROM users WHERE email = ?`,
-    [email.toLowerCase()]
-  );
-
-  const user = users[0];
-  if (!user || user.isActive !== 1) {
+  // Use local database fallback
+  const localUser = getLocalUserByEmail(email);
+  
+  if (!localUser || localUser.isActive !== 1) {
     return null;
   }
 
   // Special handling for SUPER_ADMIN with known password
   let isValidPassword = false;
-  if (user.role === 'SUPER_ADMIN') {
+  if (localUser.role === 'SUPER_ADMIN') {
     isValidPassword = password === 'Santafee@@@@@1972';
   } else {
-    isValidPassword = await verifyPassword(password, user.password);
+    isValidPassword = await verifyPassword(password, localUser.password);
   }
 
   if (!isValidPassword) {
@@ -249,32 +209,29 @@ export async function authenticateUser(
 
   // Update last login
   try {
-    await tursoQuery(dbUrl, dbToken, 
-      `UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE id = ?`,
-      [user.id]
-    );
+    updateLocalUserLastLogin(localUser.id);
   } catch {
     // Ignore update errors
   }
 
   const payload: JWTPayload = {
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-    organizationId: user.organizationId,
-    name: user.name,
+    userId: localUser.id,
+    email: localUser.email,
+    role: localUser.role,
+    organizationId: localUser.organizationId,
+    name: localUser.name,
   };
 
   const token = await generateToken(payload);
 
   return {
     user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      organizationId: user.organizationId,
-      avatar: user.avatar,
+      id: localUser.id,
+      email: localUser.email,
+      name: localUser.name,
+      role: localUser.role,
+      organizationId: localUser.organizationId,
+      avatar: localUser.avatar,
     },
     token,
   };

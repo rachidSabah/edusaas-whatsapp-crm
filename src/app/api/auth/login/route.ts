@@ -1,24 +1,13 @@
-export const runtime = 'edge';
-
-// Authentication API route - Edge Runtime compatible for Cloudflare
+// Authentication API route - Node.js runtime for local development
+// For Cloudflare deployment, set runtime = 'edge' and use Turso HTTP client
 import { NextRequest } from 'next/server';
-import { getRequestContext } from '@cloudflare/next-on-pages';
 import { type CloudflareEnv, getDbCredentials } from '@/lib/turso-http';
 import { authenticateUser, setAuthCookie } from '@/lib/auth-edge';
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Get Cloudflare environment bindings (if available)
-    let env: CloudflareEnv | null = null;
-    try {
-      const ctx = getRequestContext();
-      env = ctx.env as CloudflareEnv;
-    } catch {
-      // Not in Cloudflare context, will use fallback credentials
-    }
-    
     // Get database credentials with fallback support
-    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
+    const { url: dbUrl, token: dbToken } = getDbCredentials(null);
 
     // 2. Parse request body
     const body = await request.json() as { email?: string; password?: string };
