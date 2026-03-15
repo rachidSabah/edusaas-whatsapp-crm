@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-edge';
 import { getDbContext } from '@/lib/db-context';
+import { sendWhatsAppMessage, type WhatsAppConfig } from '@/modules/whatsapp';
 
 interface Template {
   id: string;
@@ -30,7 +31,6 @@ function processTemplateContent(
   
   // Add signature
   if (signature) {
-    // Replace {organisation} in signature
     const processedSignature = signature.replace(
       /\{organisation\}/g, 
       variables.organisation || 'Administration'
@@ -79,7 +79,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as {
+      to?: string;
+      templateId?: string;
+      triggerAction?: string;
+      variables?: Record<string, string>;
+      message?: string;
+    };
     const { 
       to, 
       templateId, 
@@ -94,6 +100,21 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Get WhatsApp configuration for this organization
+    const waConfigs = await db.query<{
+      id: string;
+      provider: string;
+      apiUrl: string;
+      apiKey: string;
+      instanceId: string | null;
+    }>(
+      `SELECT id, provider, apiUrl, apiKey, instanceId 
+       FROM whatsapp_accounts 
+       WHERE organizationId = ? AND isActive = 1 AND isDefault = 1 
+       ORDER BY createdAt DESC LIMIT 1`,
+      [user.organizationId]
+    );
 
     // Get organization info
     const orgResult = await db.query<{ name: string }>(
@@ -120,7 +141,7 @@ export async function POST(request: NextRequest) {
 
       if (!template) {
         return NextResponse.json(
-          { error: 'Template non trouvé' },
+          { error: 'Template not found' },
           { status: 404 }
         );
       }
@@ -146,10 +167,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create contact
-    let contactId: string | null = null;
+    let contactId: string;
     const contacts = await db.query<{ id: string }>(
-      `SELECT id FROM contacts WHERE organizationId = ? AND phone = ?`,
-      [user.organizationId, to]
+      `SELECT id FROM contacts WHERE organizationId = ? AND phone LIKE ?`,
+      [user.organizationId, `%${to}%`]
     );
 
     if (contacts.length > 0) {
@@ -158,7 +179,8 @@ export async function POST(request: NextRequest) {
       // Create new contact
       contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       await db.execute(
-        `INSERT INTO contacts (id, organizationId, phone, tags) VALUES (?, ?, ?, 'PARENT')`,
+        `INSERT INTO contacts (id, organizationId, phone, tags, createdAt, updatedAt) 
+         VALUES (?, ?, ?, 'PARENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         [contactId, user.organizationId, to]
       );
     }
@@ -166,7 +188,9 @@ export async function POST(request: NextRequest) {
     // Find or create conversation
     let conversationId: string;
     const conversations = await db.query<{ id: string }>(
-      `SELECT id FROM conversations WHERE organizationId = ? AND contactId = ? AND status IN ('active', 'pending') ORDER BY lastMessageAt DESC LIMIT 1`,
+      `SELECT id FROM conversations 
+       WHERE organizationId = ? AND contactId = ? AND status IN ('active', 'pending') 
+       ORDER BY lastMessageAt DESC LIMIT 1`,
       [user.organizationId, contactId]
     );
 
@@ -175,38 +199,57 @@ export async function POST(request: NextRequest) {
     } else {
       conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       await db.execute(
-        `INSERT INTO conversations (id, organizationId, contactId, status) VALUES (?, ?, ?, 'active')`,
+        `INSERT INTO conversations (id, organizationId, contactId, status, createdAt, updatedAt) 
+         VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         [conversationId, user.organizationId, contactId]
       );
+    }
+
+    // Try to send via WhatsApp API if configured
+    let sendResult = { success: true, messageId: `msg_${Date.now()}` };
+    
+    if (waConfigs.length > 0) {
+      const config = waConfigs[0];
+      const waConfig: WhatsAppConfig = {
+        provider: config.provider as 'evolution' | 'business-api' | 'custom',
+        apiUrl: config.apiUrl,
+        apiKey: config.apiKey,
+        instanceId: config.instanceId || undefined,
+        organizationId: user.organizationId,
+      };
+      
+      sendResult = await sendWhatsAppMessage(waConfig, to, finalMessage);
     }
 
     // Store outgoing message
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     await db.execute(
-      `INSERT INTO messages (id, organizationId, conversationId, content, direction, status) VALUES (?, ?, ?, ?, 'outbound', 'sent')`,
-      [msgId, user.organizationId, conversationId, finalMessage]
+      `INSERT INTO messages (id, organizationId, conversationId, content, direction, status, createdAt) 
+       VALUES (?, ?, ?, ?, 'outbound', ?, CURRENT_TIMESTAMP)`,
+      [msgId, user.organizationId, conversationId, finalMessage, sendResult.success ? 'sent' : 'failed']
     );
 
     // Update conversation
     await db.execute(
-      `UPDATE conversations SET lastMessageAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE conversations 
+       SET lastMessageAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
       [conversationId]
     );
 
-    // In production, integrate with actual WhatsApp API here
-    // For now, we simulate successful sending
-
     return NextResponse.json({ 
-      success: true, 
+      success: sendResult.success,
       messageId: msgId,
+      whatsappMessageId: sendResult.messageId,
       message: finalMessage,
       conversationId,
-      to
+      to,
+      error: sendResult.error
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('WhatsApp send error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: String(error) },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
