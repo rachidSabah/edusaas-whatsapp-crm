@@ -1,18 +1,10 @@
 // Turso HTTP Client for Cloudflare Edge Runtime
 // This module provides a simple HTTP-based Turso client that works with Cloudflare Workers
 
-// Database credentials - will be overridden by environment variables in Cloudflare
-// To get a new Turso token:
-// 1. Go to https://turso.tech/app
-// 2. Select your database: edusaas-rachidelsabah
-// 3. Go to Settings → Tokens
-// 4. Create a new token with "Full Access" or "Read Write" permissions
-// 5. Copy the token and add it to Cloudflare Pages environment variables
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
-const FALLBACK_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-// Note: The token below is expired. You MUST set TURSO_AUTH_TOKEN in Cloudflare environment variables
-const FALLBACK_TURSO_TOKEN = ''; // Set via Cloudflare dashboard
-const FALLBACK_JWT_SECRET = 'edusaas-jwt-secret-key-2024-production';
+// Database credentials - set via Cloudflare Dashboard environment variables
+// Required: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, JWT_SECRET
 
 export interface CloudflareEnv {
   TURSO_DATABASE_URL?: string;
@@ -37,31 +29,74 @@ interface TursoResult {
 }
 
 /**
- * Get database credentials with fallback support
+ * Get Cloudflare environment bindings
+ * Returns null if not in Cloudflare context
+ */
+function getCloudflareEnv(): CloudflareEnv | null {
+  try {
+    const ctx = getRequestContext();
+    return ctx.env as CloudflareEnv;
+  } catch {
+    // Not in Cloudflare context (local development or other environments)
+    return null;
+  }
+}
+
+/**
+ * Get database credentials with clear error handling
+ * MUST have TURSO_AUTH_TOKEN set either in Cloudflare or process.env
  */
 export function getDbCredentials(env?: CloudflareEnv | null): { url: string; token: string } {
-  const url = env?.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL || FALLBACK_TURSO_URL;
-  const token = env?.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || FALLBACK_TURSO_TOKEN;
+  // Try Cloudflare context first
+  const cfEnv = env ?? getCloudflareEnv();
   
+  const url = cfEnv?.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
+  const token = cfEnv?.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+  
+  // Clear error if token is missing
   if (!token) {
-    console.warn('WARNING: TURSO_AUTH_TOKEN not set. Database operations will fail.');
+    const errorDetails = [
+      'TURSO_AUTH_TOKEN is not configured.',
+      '',
+      'To fix this:',
+      '1. Go to Cloudflare Dashboard → Pages → Your Project → Settings → Environment variables',
+      '2. Add TURSO_AUTH_TOKEN with your Turso database token',
+      '3. Get token from: https://turso.tech/app → Your Database → Settings → Tokens',
+      '',
+      'Current context:',
+      `- In Cloudflare: ${cfEnv ? 'Yes' : 'No'}`,
+      `- process.env.TURSO_AUTH_TOKEN: ${process.env.TURSO_AUTH_TOKEN ? 'Set' : 'Not set'}`,
+    ].join('\n');
+    
+    throw new Error(errorDetails);
+  }
+  
+  if (!url) {
+    throw new Error('TURSO_DATABASE_URL is not configured. Please set it in your environment variables.');
   }
   
   return { url, token };
 }
 
 /**
- * Get JWT secret with fallback
+ * Get JWT secret with clear error handling
  */
 export function getJwtSecret(env?: CloudflareEnv | null): string {
-  return env?.JWT_SECRET || process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
+  const cfEnv = env ?? getCloudflareEnv();
+  const secret = cfEnv?.JWT_SECRET || process.env.JWT_SECRET;
+  
+  if (!secret) {
+    console.warn('WARNING: JWT_SECRET not set. Using development fallback. Set JWT_SECRET in production!');
+    return 'edusaas-jwt-secret-key-development-fallback';
+  }
+  
+  return secret;
 }
 
 /**
  * Format arguments for Turso HTTP API
- * Turso expects all values as strings in the JSON payload
  */
-function formatArgs(args: any[]): TursoCell[] {
+function formatArgs(args: unknown[]): TursoCell[] {
   return args.map(arg => {
     if (arg === null || arg === undefined) return { type: 'null' };
     if (typeof arg === 'string') return { type: 'text', value: arg };
@@ -78,55 +113,84 @@ export async function tursoExecute(
   url: string,
   authToken: string,
   sql: string,
-  args: any[] = []
+  args: unknown[] = []
 ): Promise<TursoResult> {
-  if (!authToken) {
-    throw new Error('TURSO_AUTH_TOKEN is required. Please set it in your environment variables.');
-  }
-
-  // Ensure URL uses https://
+  // Convert libsql:// to https://
   const httpUrl = url.startsWith('libsql://') 
     ? url.replace('libsql://', 'https://')
     : url;
 
-  const response = await fetch(`${httpUrl}/v2/pipeline`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      requests: [
-        {
-          type: 'execute',
-          stmt: {
-            sql,
-            args: formatArgs(args),
+  const startTime = Date.now();
+  
+  try {
+    const response = await fetch(`${httpUrl}/v2/pipeline`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: [
+          {
+            type: 'execute',
+            stmt: {
+              sql,
+              args: formatArgs(args),
+            },
           },
-        },
-      ],
-    }),
-  });
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Turso error: ${response.status} - ${text}`);
+    if (!response.ok) {
+      const text = await response.text();
+      const duration = Date.now() - startTime;
+      
+      // Parse and provide clear error message
+      let errorDetail = text;
+      try {
+        const jsonError = JSON.parse(text);
+        errorDetail = jsonError.error || jsonError.message || text;
+      } catch {
+        // Keep original text
+      }
+      
+      throw new Error(
+        `Turso database error (${response.status}) after ${duration}ms:\n` +
+        `  SQL: ${sql.substring(0, 100)}${sql.length > 100 ? '...' : ''}\n` +
+        `  Error: ${errorDetail}\n` +
+        `  Check: Is your TURSO_AUTH_TOKEN valid and not expired?`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    // Re-throw with context if it's our error
+    if (error instanceof Error && error.message.includes('Turso')) {
+      throw error;
+    }
+    
+    // Network or other errors
+    throw new Error(
+      `Failed to connect to Turso database:\n` +
+      `  URL: ${httpUrl}\n` +
+      `  Error: ${error instanceof Error ? error.message : String(error)}\n` +
+      `  Check: Is the database URL correct and accessible?`
+    );
   }
-
-  return await response.json();
 }
 
 /**
  * Parse Turso result into JavaScript objects
  */
-export function parseTursoResult<T = Record<string, any>>(result: TursoResult): T[] {
+export function parseTursoResult<T = Record<string, unknown>>(result: TursoResult): T[] {
   const cols = result?.results?.[0]?.response?.result?.cols;
   const rows = result?.results?.[0]?.response?.result?.rows;
 
   if (!cols || !rows) return [];
 
   return rows.map((row: TursoCell[]) => {
-    const obj: Record<string, any> = {};
+    const obj: Record<string, unknown> = {};
     cols.forEach((col: { name: string }, i: number) => {
       const cell = row[i];
       if (cell?.type === 'null') {
@@ -146,15 +210,12 @@ export function parseTursoResult<T = Record<string, any>>(result: TursoResult): 
 /**
  * Execute a query and return parsed results
  */
-export async function tursoQuery<T = Record<string, any>>(
+export async function tursoQuery<T = Record<string, unknown>>(
   url: string,
   authToken: string,
   sql: string,
-  args: any[] = []
+  args: unknown[] = []
 ): Promise<T[]> {
   const result = await tursoExecute(url, authToken, sql, args);
   return parseTursoResult<T>(result);
 }
-
-// Export fallbacks for direct use if needed
-export { FALLBACK_TURSO_URL, FALLBACK_TURSO_TOKEN, FALLBACK_JWT_SECRET };
