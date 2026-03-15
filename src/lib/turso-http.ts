@@ -250,3 +250,4 @@ export async function tursoQuery<T = Record<string, unknown>>(
   const result = await tursoExecute(url, authToken, sql, args);
   return parseTursoResult<T>(result);
 }
+
