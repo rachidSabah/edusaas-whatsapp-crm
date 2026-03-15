@@ -5,11 +5,16 @@ import { getRequestContext } from '@cloudflare/next-on-pages';
 
 // Database credentials - set via Cloudflare Dashboard environment variables
 // Required: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, JWT_SECRET
+// NOTE: For secrets, environment variables
+// Cloudflare will encrypt them at runtime.
+// Access: Try env.VARIABLE_NAME first (works for both plain and secret)
+// Then fall back to process.env.VARIABLE_NAME
 
 export interface CloudflareEnv {
   TURSO_DATABASE_URL?: string;
   TURSO_AUTH_TOKEN?: string;
   JWT_SECRET?: string;
+  [key: string]: string;
 }
 
 interface TursoCell {
@@ -43,15 +48,42 @@ function getCloudflareEnv(): CloudflareEnv | null {
 }
 
 /**
+ * Get a specific environment variable
+ * Tries multiple sources in order:
+ * 1. env parameter (passed explicitly)
+ * 2. Cloudflare bindings (env.VARIABLE_NAME)
+ * 3. process.env.VARIABLE_NAME
+ */
+function getEnvVar(name: string, env?: CloudflareEnv | null): string | undefined {
+  // Try explicit parameter first
+  if (env && env[name as keyof CloudflareEnv]) {
+    return env[name as keyof CloudflareEnv];
+  }
+  
+  // Try Cloudflare context
+  const cfEnv = getCloudflareEnv();
+  if (cfEnv && cfEnv[name as keyof CloudflareEnv]) {
+    return cfEnv[name as keyof CloudflareEnv];
+  }
+  
+  // Fall back to process.env
+  return process.env[name];
+}
+
+/**
  * Get database credentials with clear error handling
  * MUST have TURSO_AUTH_TOKEN set either in Cloudflare or process.env
  */
 export function getDbCredentials(env?: CloudflareEnv | null): { url: string; token: string } {
-  // Try Cloudflare context first
-  const cfEnv = env ?? getCloudflareEnv();
+  const url = getEnvVar('TURSO_DATABASE_URL', env);
+  const token = getEnvVar('TURSO_AUTH_TOKEN', env);
   
-  const url = cfEnv?.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL;
-  const token = cfEnv?.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN;
+  // Debug logging
+  const cfEnv = getCloudflareEnv();
+  console.log('[DbCredentials] Checking credentials...');
+  console.log(`- Cloudflare context: ${cfEnv ? 'Yes' : 'No'}`);
+  console.log(`- TURSO_DATABASE_URL: ${url ? 'Set' : 'Not set'}`);
+  console.log(`- TURSO_AUTH_TOKEN: ${token ? `Set (${token.length} chars)` : 'Not set'}`);
   
   // Clear error if token is missing
   if (!token) {
@@ -82,8 +114,7 @@ export function getDbCredentials(env?: CloudflareEnv | null): { url: string; tok
  * Get JWT secret with clear error handling
  */
 export function getJwtSecret(env?: CloudflareEnv | null): string {
-  const cfEnv = env ?? getCloudflareEnv();
-  const secret = cfEnv?.JWT_SECRET || process.env.JWT_SECRET;
+  const secret = getEnvVar('JWT_SECRET', env);
   
   if (!secret) {
     console.warn('WARNING: JWT_SECRET not set. Using development fallback. Set JWT_SECRET in production!');
