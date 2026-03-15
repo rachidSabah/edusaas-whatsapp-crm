@@ -1,24 +1,19 @@
+# Cloudflare Pages Configuration for Next.js
+# This file configures the deployment for @cloudflare/next-on-pages
+
 name = "edusaas-whatsapp-crm"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 
-# Build output directory for Cloudflare Pages
+# Build output directory - required for @cloudflare/next-on-pages
 pages_build_output_dir = ".vercel/output/static"
 
-# Route all requests through the Next.js application
-[site]
-  bucket = "./"
-
-# Environment variables - MUST be set in Cloudflare Dashboard
+# Environment variables MUST be configured in Cloudflare Dashboard:
 # Go to: Pages > edusaas-whatsapp-crm > Settings > Environment variables
+#
 # Required variables:
-# - TURSO_DATABASE_URL: Your Turso database URL (e.g., libsql://your-db.turso.io)
-# - TURSO_AUTH_TOKEN: Your Turso authentication token
-# - JWT_SECRET: Secret key for JWT signing (optional, has fallback)
-
-# Bindings for accessing environment variables in edge functions
-# These are automatically available via getRequestContext().env
-[[vars]]
-TURSO_DATABASE_URL = "libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io"
-# Note: TURSO_AUTH_TOKEN should be set via Cloudflare Dashboard for security
-# JWT_SECRET has a development fallback but should be set in production
+# - TURSO_DATABASE_URL: libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io
+# - TURSO_AUTH_TOKEN: Your Turso authentication token (get from https://turso.tech/app)
+# - JWT_SECRET: Secret key for JWT signing (optional, has development fallback)
+#
+# These variables are accessible in edge functions via getRequestContext().env
