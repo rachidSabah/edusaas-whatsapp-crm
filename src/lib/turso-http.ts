@@ -1,10 +1,17 @@
 // Turso HTTP Client for Cloudflare Edge Runtime
 // This module provides a simple HTTP-based Turso client that works with Cloudflare Workers
 
-// Fallback database credentials - used when env vars are not available
-// Primary database: edusaas-rachidelsabah
+// Database credentials - will be overridden by environment variables in Cloudflare
+// To get a new Turso token:
+// 1. Go to https://turso.tech/app
+// 2. Select your database: edusaas-rachidelsabah
+// 3. Go to Settings → Tokens
+// 4. Create a new token with "Full Access" or "Read Write" permissions
+// 5. Copy the token and add it to Cloudflare Pages environment variables
+
 const FALLBACK_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NDAwMjQ3MTAsImlkIjoiMDE5NmFhYjktMTMwYS03NDc2LTk3Y2MtMTcxZjYzYzI5YmJhIiwicmlkIjoiNjczYjQxNTItYmI1Yy00MTI0LTlmZTUtYTU2MzVlMDIzODNlIn0.I8hmDhMdlI8XZ_7HsJ7m6n3YQ7PxQBZCG6XzF4I2elL-6N1FqFM5rWPlqDIdkWnNlR6U7gkHPXVvTtXsAQjBAg';
+// Note: The token below is expired. You MUST set TURSO_AUTH_TOKEN in Cloudflare environment variables
+const FALLBACK_TURSO_TOKEN = ''; // Set via Cloudflare dashboard
 const FALLBACK_JWT_SECRET = 'edusaas-jwt-secret-key-2024-production';
 
 export interface CloudflareEnv {
@@ -33,8 +40,13 @@ interface TursoResult {
  * Get database credentials with fallback support
  */
 export function getDbCredentials(env?: CloudflareEnv | null): { url: string; token: string } {
-  const url = env?.TURSO_DATABASE_URL || FALLBACK_TURSO_URL;
-  const token = env?.TURSO_AUTH_TOKEN || FALLBACK_TURSO_TOKEN;
+  const url = env?.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL || FALLBACK_TURSO_URL;
+  const token = env?.TURSO_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || FALLBACK_TURSO_TOKEN;
+  
+  if (!token) {
+    console.warn('WARNING: TURSO_AUTH_TOKEN not set. Database operations will fail.');
+  }
+  
   return { url, token };
 }
 
@@ -42,7 +54,7 @@ export function getDbCredentials(env?: CloudflareEnv | null): { url: string; tok
  * Get JWT secret with fallback
  */
 export function getJwtSecret(env?: CloudflareEnv | null): string {
-  return env?.JWT_SECRET || FALLBACK_JWT_SECRET;
+  return env?.JWT_SECRET || process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
 }
 
 /**
@@ -68,6 +80,10 @@ export async function tursoExecute(
   sql: string,
   args: any[] = []
 ): Promise<TursoResult> {
+  if (!authToken) {
+    throw new Error('TURSO_AUTH_TOKEN is required. Please set it in your environment variables.');
+  }
+
   // Ensure URL uses https://
   const httpUrl = url.startsWith('libsql://') 
     ? url.replace('libsql://', 'https://')

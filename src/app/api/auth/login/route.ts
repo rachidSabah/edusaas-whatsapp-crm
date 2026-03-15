@@ -1,15 +1,16 @@
-// Authentication API route - Node.js runtime for local development
-// For Cloudflare deployment, set runtime = 'edge' and use Turso HTTP client
+export const runtime = 'edge';
+
+// Authentication API route - Edge Runtime compatible for Cloudflare
 import { NextRequest } from 'next/server';
 import { type CloudflareEnv, getDbCredentials } from '@/lib/turso-http';
 import { authenticateUser, setAuthCookie } from '@/lib/auth-edge';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get database credentials with fallback support
+    // Get database credentials
     const { url: dbUrl, token: dbToken } = getDbCredentials(null);
 
-    // 2. Parse request body
+    // Parse request body
     const body = await request.json() as { email?: string; password?: string };
     const { email, password } = body;
 
@@ -20,7 +21,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Authenticate user
+    // Check if token is available
+    if (!dbToken) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Database configuration missing', 
+          details: 'TURSO_AUTH_TOKEN environment variable is not set. Please configure it in your Cloudflare Pages settings.' 
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Authenticate user
     const result = await authenticateUser(email, password, dbUrl, dbToken);
 
     if (!result) {
@@ -30,10 +42,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Set auth cookie
+    // Set auth cookie
     await setAuthCookie(result.token);
 
-    // 5. Return success response
+    // Return success response
     return new Response(
       JSON.stringify({
         user: result.user,
