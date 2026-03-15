@@ -1,10 +1,15 @@
 // Turso HTTP Client for Cloudflare Edge Runtime
 // This module provides a simple HTTP-based Turso client that works with Cloudflare Workers
 
+// Fallback database credentials - used when env vars are not available
+const FALLBACK_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
+const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1NzQ2NTIsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
+const FALLBACK_JWT_SECRET = 'edusaas-jwt-secret-key-2024-production';
+
 export interface CloudflareEnv {
-  TURSO_DATABASE_URL: string;
-  TURSO_AUTH_TOKEN: string;
-  JWT_SECRET: string;
+  TURSO_DATABASE_URL?: string;
+  TURSO_AUTH_TOKEN?: string;
+  JWT_SECRET?: string;
 }
 
 interface TursoCell {
@@ -21,6 +26,22 @@ interface TursoResult {
       };
     };
   }>;
+}
+
+/**
+ * Get database credentials with fallback support
+ */
+export function getDbCredentials(env?: CloudflareEnv | null): { url: string; token: string } {
+  const url = env?.TURSO_DATABASE_URL || FALLBACK_TURSO_URL;
+  const token = env?.TURSO_AUTH_TOKEN || FALLBACK_TURSO_TOKEN;
+  return { url, token };
+}
+
+/**
+ * Get JWT secret with fallback
+ */
+export function getJwtSecret(env?: CloudflareEnv | null): string {
+  return env?.JWT_SECRET || FALLBACK_JWT_SECRET;
 }
 
 /**
@@ -117,3 +138,6 @@ export async function tursoQuery<T = Record<string, any>>(
   const result = await tursoExecute(url, authToken, sql, args);
   return parseTursoResult<T>(result);
 }
+
+// Export fallbacks for direct use if needed
+export { FALLBACK_TURSO_URL, FALLBACK_TURSO_TOKEN, FALLBACK_JWT_SECRET };

@@ -3,27 +3,25 @@ export const runtime = 'edge';
 // Authentication API route - Edge Runtime compatible for Cloudflare
 import { NextRequest } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { type CloudflareEnv, tursoQuery } from '@/lib/turso-http';
+import { type CloudflareEnv, getDbCredentials } from '@/lib/turso-http';
 import { authenticateUser, setAuthCookie } from '@/lib/auth-edge';
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Safely grab Cloudflare's environment bindings
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
-    
-    const dbUrl = env.TURSO_DATABASE_URL;
-    const dbToken = env.TURSO_AUTH_TOKEN;
-
-    if (!dbUrl || !dbToken) {
-      return new Response(
-        JSON.stringify({ error: 'Database configuration missing' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+    // 1. Get Cloudflare environment bindings (if available)
+    let env: CloudflareEnv | null = null;
+    try {
+      const ctx = getRequestContext();
+      env = ctx.env as CloudflareEnv;
+    } catch {
+      // Not in Cloudflare context, will use fallback credentials
     }
+    
+    // Get database credentials with fallback support
+    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
 
     // 2. Parse request body
-    const body = await request.json();
+    const body = await request.json() as { email?: string; password?: string };
     const { email, password } = body;
 
     if (!email || !password) {

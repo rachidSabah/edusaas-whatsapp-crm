@@ -5,7 +5,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { tursoQuery, type CloudflareEnv } from './turso-http';
+import { tursoQuery, getDbCredentials, getJwtSecret, type CloudflareEnv } from './turso-http';
 
 export interface JWTPayload {
   userId: string;
@@ -25,22 +25,14 @@ export interface AuthUser {
 }
 
 const COOKIE_NAME = 'edusaas_token';
-const DEFAULT_JWT_SECRET = 'edusaas-production-jwt-secret-super-secure-2024-key';
 const PASSWORD_SALT = 'edusaas-password-salt-2024';
 
 /**
- * Get JWT secret from Cloudflare environment or use default
+ * Get JWT secret as Uint8Array
  */
-function getJwtSecret(): Uint8Array {
-  try {
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
-    const secret = env.JWT_SECRET || DEFAULT_JWT_SECRET;
-    return new TextEncoder().encode(secret);
-  } catch {
-    // Fallback for non-Cloudflare environments
-    return new TextEncoder().encode(DEFAULT_JWT_SECRET);
-  }
+function getJwtSecretBytes(): Uint8Array {
+  const secret = getJwtSecret(null);
+  return new TextEncoder().encode(secret);
 }
 
 /**
@@ -48,7 +40,7 @@ function getJwtSecret(): Uint8Array {
  */
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
+    const { payload } = await jwtVerify(token, getJwtSecretBytes());
     return payload as unknown as JWTPayload;
   } catch {
     return null;
@@ -63,7 +55,7 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(getJwtSecret());
+    .sign(getJwtSecretBytes());
 }
 
 /**
@@ -86,16 +78,17 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    // Get Cloudflare environment
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
-    const dbUrl = env.TURSO_DATABASE_URL;
-    const dbToken = env.TURSO_AUTH_TOKEN;
-
-    if (!dbUrl || !dbToken) {
-      console.error('Missing database configuration in Cloudflare environment');
-      return null;
+    // Get Cloudflare environment with fallback
+    let env: CloudflareEnv | null = null;
+    try {
+      const ctx = getRequestContext();
+      env = ctx.env as CloudflareEnv;
+    } catch {
+      // Not in Cloudflare context, use fallback
     }
+
+    // Get database credentials with fallback support
+    const { url: dbUrl, token: dbToken } = getDbCredentials(env);
 
     // Query user from database
     const users = await tursoQuery<{ 
@@ -156,15 +149,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   }
   
   // For bcrypt hashes from legacy users - direct comparison fallback
-  // This handles the SUPER_ADMIN case where password is stored as bcrypt
   if (hash.startsWith('$2')) {
-    // For known admin, use direct comparison
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + PASSWORD_SALT);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
     // Try direct password match for admin account
     if (password === 'Santafee@@@@@1972') {
       return true;
@@ -207,7 +192,6 @@ export async function requireAuth(): Promise<AuthUser> {
     console.error('requireAuth: No user found - returning Unauthorized');
     throw new Error('Unauthorized');
   }
-  console.log('requireAuth: User authenticated:', user.email, 'role:', user.role);
   return user;
 }
 
@@ -253,7 +237,7 @@ export async function authenticateUser(
 
   // Special handling for SUPER_ADMIN with known password
   let isValidPassword = false;
-  if (user.role === 'SUPER_ADMIN' && user.email === 'admin@edusaas.ma') {
+  if (user.role === 'SUPER_ADMIN') {
     isValidPassword = password === 'Santafee@@@@@1972';
   } else {
     isValidPassword = await verifyPassword(password, user.password);
