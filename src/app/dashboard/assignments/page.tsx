@@ -125,7 +125,7 @@ export default function AssignmentsPage() {
     dueDate: '',
     startDate: '',
     priority: 'MEDIUM',
-    attachments: [] as File[],
+    attachmentNames: [] as string[],
   });
 
   const fetchData = async () => {
@@ -165,11 +165,6 @@ export default function AssignmentsPage() {
     try {
       const method = editingTask ? 'PUT' : 'POST';
 
-      let attachmentsData: string[] = [];
-      if (formData.attachments.length > 0) {
-        attachmentsData = formData.attachments.map(f => f.name);
-      }
-
       const body = {
         ...(editingTask ? { id: editingTask.id } : {}),
         title: formData.title,
@@ -178,7 +173,7 @@ export default function AssignmentsPage() {
         dueDate: formData.dueDate,
         startDate: formData.startDate || new Date().toISOString().split('T')[0],
         priority: formData.priority,
-        attachments: attachmentsData.length > 0 ? attachmentsData : null,
+        attachments: formData.attachmentNames.length > 0 ? formData.attachmentNames : null,
       };
 
       const response = await fetch('/api/tasks', {
@@ -199,7 +194,7 @@ export default function AssignmentsPage() {
           dueDate: '',
           startDate: '',
           priority: 'MEDIUM',
-          attachments: [],
+          attachmentNames: [],
         });
         setMessage({ type: 'success', text: editingTask ? 'Tâche modifiée avec succès' : 'Tâche créée avec succès' });
         await fetchData();
@@ -236,7 +231,7 @@ export default function AssignmentsPage() {
       dueDate: task.dueDate,
       startDate: task.startDate,
       priority: task.priority,
-      attachments: [],
+      attachmentNames: [],
     });
     setDialogOpen(true);
   };
@@ -244,6 +239,12 @@ export default function AssignmentsPage() {
   const handleView = (task: Task) => {
     setViewingTask(task);
     setViewDialogOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const fileNames = files.map(f => f.name);
+    setFormData({ ...formData, attachmentNames: fileNames });
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -287,7 +288,7 @@ export default function AssignmentsPage() {
                   dueDate: '',
                   startDate: new Date().toISOString().split('T')[0],
                   priority: 'MEDIUM',
-                  attachments: [],
+                  attachmentNames: [],
                 });
               }}
             >
@@ -396,21 +397,18 @@ export default function AssignmentsPage() {
                     <Input
                       type="file"
                       multiple
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
-                        setFormData({ ...formData, attachments: files });
-                      }}
+                      onChange={handleFileChange}
                       className="cursor-pointer"
                     />
                     <p className="text-xs text-slate-500 mt-2">
                       PDF, DOC, DOCX, XLS, XLSX, images acceptés
                     </p>
-                    {formData.attachments.length > 0 && (
+                    {formData.attachmentNames.length > 0 && (
                       <div className="mt-2 space-y-1">
-                        {formData.attachments.map((file, i) => (
+                        {formData.attachmentNames.map((fileName, i) => (
                           <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
                             <FileText className="w-4 h-4" />
-                            {file.name}
+                            {fileName}
                           </div>
                         ))}
                       </div>
@@ -515,32 +513,34 @@ export default function AssignmentsPage() {
       <Card className="border-0 shadow-md">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Rechercher..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Rechercher une tâche..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-48">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous statuts</SelectItem>
+                <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(STATUS_LABELS).map(([key, label]) => (
                   <SelectItem key={key} value={key}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-48">
                 <SelectValue placeholder="Priorité" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes priorités</SelectItem>
+                <SelectItem value="all">Toutes les priorités</SelectItem>
                 {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
                   <SelectItem key={key} value={key}>{label}</SelectItem>
                 ))}
@@ -552,171 +552,141 @@ export default function AssignmentsPage() {
 
       {/* Tasks Table */}
       <Card className="border-0 shadow-md">
-        <CardContent className="p-0">
+        <CardHeader>
+          <CardTitle>Liste des tâches</CardTitle>
+        </CardHeader>
+        <CardContent>
           {loading ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 mx-auto animate-spin text-green-600" />
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
+              <p className="text-slate-500 mt-2">Chargement...</p>
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
-              <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Aucune tâche trouvée</p>
+            <div className="text-center py-8">
+              <ClipboardList className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+              <p className="text-slate-500">Aucune tâche trouvée</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tâche</TableHead>
-                  <TableHead>Assignée à</TableHead>
-                  <TableHead>Échéance</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Priorité</TableHead>
-                  <TableHead>Progression</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTasks.map((task) => (
-                  <TableRow 
-                    key={task.id}
-                    className={isOverdue(task.dueDate, task.status) ? 'bg-red-50' : ''}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{task.title}</p>
-                        {task.description && (
-                          <p className="text-sm text-slate-500 line-clamp-1">{task.description}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {task.assignedToName || <span className="text-slate-400">Non assignée</span>}
-                    </TableCell>
-                    <TableCell>
-                      <div className={`flex items-center gap-1 ${isOverdue(task.dueDate, task.status) ? 'text-red-600' : ''}`}>
-                        <Calendar className="w-4 h-4" />
-                        {format(new Date(task.dueDate), 'd MMM yyyy', { locale: fr })}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={STATUS_COLORS[task.status]}>
-                        {STATUS_LABELS[task.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={PRIORITY_COLORS[task.priority]}>
-                        {PRIORITY_LABELS[task.priority]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-24">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span>{task.progress}%</span>
-                        </div>
-                        <Progress value={task.progress} className="h-2" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleView(task)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(task)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDelete(task.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Titre</TableHead>
+                    <TableHead>Assigné à</TableHead>
+                    <TableHead>Priorité</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Échéance</TableHead>
+                    <TableHead>Progression</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredTasks.map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>{task.assignedToName || '-'}</TableCell>
+                      <TableCell>
+                        <Badge className={PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.MEDIUM}>
+                          {PRIORITY_LABELS[task.priority]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={STATUS_COLORS[task.status] || STATUS_COLORS.PENDING}>
+                          {STATUS_LABELS[task.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-slate-400" />
+                          <span className={isOverdue(task.dueDate, task.status) ? 'text-red-600 font-semibold' : ''}>
+                            {format(new Date(task.dueDate), 'dd MMM', { locale: fr })}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={task.progress} className="w-16 h-2" />
+                          <span className="text-sm text-slate-600">{task.progress}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleView(task)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(task)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500"
+                            onClick={() => handleDelete(task.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* View Task Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{viewingTask?.title}</DialogTitle>
-            <DialogDescription>Détails de la tâche</DialogDescription>
-          </DialogHeader>
-          {viewingTask && (
-            <div className="space-y-4">
+      {/* View Dialog */}
+      {viewingTask && (
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{viewingTask.title}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <p className="text-sm text-slate-600">Description</p>
+                <p className="text-slate-900">{viewingTask.description || '-'}</p>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-500">Statut</Label>
-                  <div className="mt-1">
-                    <Badge className={STATUS_COLORS[viewingTask.status]}>
-                      {STATUS_LABELS[viewingTask.status]}
-                    </Badge>
-                  </div>
+                  <p className="text-sm text-slate-600">Assigné à</p>
+                  <p className="text-slate-900">{viewingTask.assignedToName || '-'}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-500">Priorité</Label>
-                  <div className="mt-1">
-                    <Badge className={PRIORITY_COLORS[viewingTask.priority]}>
-                      {PRIORITY_LABELS[viewingTask.priority]}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-slate-500">Date de début</Label>
-                  <p className="mt-1">{format(new Date(viewingTask.startDate), 'd MMMM yyyy', { locale: fr })}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500">Date d&apos;échéance</Label>
-                  <p className={`mt-1 ${isOverdue(viewingTask.dueDate, viewingTask.status) ? 'text-red-600 font-medium' : ''}`}>
-                    {format(new Date(viewingTask.dueDate), 'd MMMM yyyy', { locale: fr })}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-slate-500">Assignée à</Label>
-                  <p className="mt-1">{viewingTask.assignedToName || 'Non assignée'}</p>
-                </div>
-                <div>
-                  <Label className="text-slate-500">Créée par</Label>
-                  <p className="mt-1">{viewingTask.createdByName || 'N/A'}</p>
+                  <p className="text-sm text-slate-600">Priorité</p>
+                  <Badge className={PRIORITY_COLORS[viewingTask.priority]}>
+                    {PRIORITY_LABELS[viewingTask.priority]}
+                  </Badge>
                 </div>
               </div>
-
-              {viewingTask.description && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-500">Description</Label>
-                  <p className="mt-1 text-slate-700 whitespace-pre-line">{viewingTask.description}</p>
+                  <p className="text-sm text-slate-600">Date de début</p>
+                  <p className="text-slate-900">{format(new Date(viewingTask.startDate), 'dd MMMM yyyy', { locale: fr })}</p>
                 </div>
-              )}
-
-              {viewingTask.progress > 0 && (
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-slate-500">Progression</Label>
-                    <span className="text-sm font-medium">{viewingTask.progress}%</span>
-                  </div>
-                  <Progress value={viewingTask.progress} className="h-3" />
+                  <p className="text-sm text-slate-600">Échéance</p>
+                  <p className="text-slate-900">{format(new Date(viewingTask.dueDate), 'dd MMMM yyyy', { locale: fr })}</p>
                 </div>
-              )}
-
-              {viewingTask.attachments && (
-                <div>
-                  <Label className="text-slate-500">Pièces jointes</Label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {JSON.parse(viewingTask.attachments).map((file: string, i: number) => (
-                      <Button key={i} variant="outline" size="sm">
-                        <Download className="w-4 h-4 mr-2" />
-                        {file}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 mb-2">Progression</p>
+                <Progress value={viewingTask.progress} className="h-2" />
+                <p className="text-sm text-slate-600 mt-1">{viewingTask.progress}%</p>
+              </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
