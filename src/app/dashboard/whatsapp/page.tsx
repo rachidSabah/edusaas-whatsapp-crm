@@ -365,6 +365,13 @@ export default function WhatsAppPage() {
         <div className="flex gap-2">
           <Button 
             variant="outline"
+            onClick={() => window.location.href = '/dashboard/whatsapp/meta-business'}
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Envoyer via Meta Business
+          </Button>
+          <Button 
+            variant="outline"
             onClick={() => window.location.href = '/dashboard/whatsapp/meta-setup'}
           >
             Configuration Meta API
