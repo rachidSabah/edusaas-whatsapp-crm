@@ -188,7 +188,7 @@ export async function PUT(request: NextRequest) {
     // Test connection by fetching phone number info
     try {
       const response = await fetch(
-        `https://graph.instagram.com/v18.0/${phoneNumberId}`,
+        `https://graph.facebook.com/v22.0/${phoneNumberId}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

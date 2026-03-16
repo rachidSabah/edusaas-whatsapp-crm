@@ -87,10 +87,17 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       console.error('Meta API error:', result);
+      let errorMessage = result.error?.message || 'Failed to send message';
+      
+      // Specific check for expired or invalid token
+      if (result.error?.code === 190 || result.error?.error_subcode === 463 || result.error?.error_subcode === 467) {
+        errorMessage = 'Votre jeton d\'accès Meta a expiré ou est invalide. Veuillez en générer un nouveau sur le portail Meta Developers.';
+      }
+
       return NextResponse.json(
         {
           success: false,
-          error: result.error?.message || 'Failed to send message',
+          error: errorMessage,
           details: result.error,
         },
         { status: response.status }
@@ -141,11 +148,18 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
 
     if (!response.ok) {
+      let errorMessage = data.error?.message || 'Invalid credentials';
+      
+      // Specific check for expired or invalid token
+      if (data.error?.code === 190 || data.error?.error_subcode === 463 || data.error?.error_subcode === 467) {
+        errorMessage = 'Votre jeton d\'accès Meta a expiré ou est invalide. Veuillez en générer un nouveau sur le portail Meta Developers.';
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: 'Connection test failed',
-          details: data.error?.message || 'Invalid credentials',
+          details: errorMessage,
         },
         { status: 400 }
       );
