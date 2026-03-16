@@ -487,15 +487,46 @@ async function handleRequest(request: Request): Promise<Response> {
 }
 
 // Start server
-console.log(`WhatsApp Service starting on port ${PORT}...`);
+import { createServer } from 'http';
 
-// Use Bun's built-in server
-Bun.serve({
-  port: PORT,
-  fetch: handleRequest,
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    const path = url.pathname;
+    
+    // Read body for POST requests
+    let body = {};
+    if (req.method === 'POST') {
+      const buffers = [];
+      for await (const chunk of req) {
+        buffers.push(chunk);
+      }
+      const data = Buffer.concat(buffers).toString();
+      if (data) body = JSON.parse(data);
+    }
+
+    // Mock Request object for handleRequest
+    const mockRequest = {
+      method: req.method,
+      url: url.toString(),
+      json: async () => body
+    };
+
+    const response = await handleRequest(mockRequest as any);
+    const responseData = await response.json();
+    
+    res.writeHead(response.status || 200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(responseData));
+  } catch (error) {
+    console.error('Server error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: String(error) }));
+  }
 });
 
-console.log(`WhatsApp Service running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`WhatsApp Service running on http://localhost:${PORT}`);
+});
 console.log('API Endpoints:');
 console.log('  POST /connect     - Start WhatsApp connection');
 console.log('  GET  /status     - Get connection status');
