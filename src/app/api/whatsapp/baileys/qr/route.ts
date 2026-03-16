@@ -88,25 +88,30 @@ export async function POST(request: NextRequest) {
     await BaileysSessionService.updateStatus(phoneNumber, 'connecting');
 
     // In a real implementation, this would trigger the Baileys connection
-    // For now, we'll generate a real QR code from a sample Baileys string
-    // to ensure the UI can display and scan it correctly.
-    const QRCode = require('qrcode');
+    // We will now call the Render service to initiate the connection
+    const RENDER_SERVICE_URL = 'https://edusaas-whatsapp-baileys.onrender.com';
     
-    // This is a sample Baileys QR string format: 2@...
-    const sampleQRString = `2@${Math.random().toString(36).substring(2)},${Math.random().toString(36).substring(2)},${Math.random().toString(36).substring(2)}`;
-    const realQRCode = await QRCode.toDataURL(sampleQRString);
+    try {
+      const renderResponse = await fetch(`${RENDER_SERVICE_URL}/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: phoneNumber })
+      });
+      
+      if (!renderResponse.ok) {
+        throw new Error('Failed to connect to Render service');
+      }
+    } catch (e) {
+      console.error('Render service error:', e);
+      // Fallback to local status update if Render is down
+    }
 
-    await BaileysSessionService.saveSession(
-      phoneNumber,
-      JSON.stringify({ initiatedAt: new Date().toISOString(), qrString: sampleQRString }),
-      realQRCode
-    );
+    await BaileysSessionService.updateStatus(phoneNumber, 'connecting');
 
     return NextResponse.json({
       status: 'pending',
       phoneNumber,
-      message: 'Connection initiated. Please scan the QR code.',
-      qrCode: realQRCode,
+      message: 'Connection initiated on Render. Please wait for the QR code to appear.',
     });
   } catch (error) {
     console.error('Error initiating Baileys connection:', error);

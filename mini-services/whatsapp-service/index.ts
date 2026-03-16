@@ -15,7 +15,8 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import P from 'pino';
-import qrcode from 'qrcode-terminal';
+import qrcodeTerminal from 'qrcode-terminal';
+import QRCode from 'qrcode';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -181,17 +182,31 @@ async function startWhatsAppConnection(organizationId: string): Promise<void> {
     const conn = connections.get(organizationId);
 
     if (qr) {
-      // Generate QR code
-      qrcode.generate(qr, { small: true });
+      // Generate QR code in terminal
+      qrcodeTerminal.generate(qr, { small: true });
+      
+      // Generate Data URL for frontend
+      const qrDataUrl = await QRCode.toDataURL(qr);
       
       // Store QR for API access
-      pendingQRCodes.set(organizationId, qr);
+      pendingQRCodes.set(organizationId, qrDataUrl);
       
       if (conn) {
-        conn.qrCode = qr;
+        conn.qrCode = qrDataUrl;
       }
 
-      console.log(`[Org ${organizationId}] QR Code generated - scan with WhatsApp`);
+      // Update database with QR code for frontend
+      await tursoExecute(
+        `UPDATE organizations SET whatsappQRCode = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+        [qrDataUrl, organizationId]
+      );
+      
+      await tursoExecute(
+        `UPDATE whatsapp_accounts SET qrCode = ?, updatedAt = CURRENT_TIMESTAMP WHERE organizationId = ?`,
+        [qrDataUrl, organizationId]
+      );
+
+      console.log(`[Org ${organizationId}] QR Code generated and saved to DB`);
     }
 
     if (connection === 'close') {
