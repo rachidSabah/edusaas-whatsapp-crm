@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 import { getDbContext } from '@/lib/db-context';
 
 export async function GET(request: NextRequest) {

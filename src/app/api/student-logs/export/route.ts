@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 import { requireAuth } from '@/lib/auth-edge';
 import { getDbContext } from '@/lib/db-context';
 
