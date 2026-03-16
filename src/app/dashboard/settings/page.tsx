@@ -284,7 +284,7 @@ Instructions:
       }
 
       // Small delay to show saving state
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       // Refresh organization data
       await fetchOrganization();
       alert('Paramètres enregistrés avec succès!');

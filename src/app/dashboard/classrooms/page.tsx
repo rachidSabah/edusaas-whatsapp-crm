@@ -85,7 +85,7 @@ export default function ClassroomsPage() {
         setEditingClassroom(null);
         setFormData({ name: '', code: '', capacity: '', building: '', floor: '', facilities: '' });
         // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchClassrooms();
       } else {
         const data = await response.json();
