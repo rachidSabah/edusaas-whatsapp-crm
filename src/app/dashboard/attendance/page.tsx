@@ -56,7 +56,10 @@ import {
   FileDown,
   CalendarDays,
   BookOpen,
+  Settings2,
 } from 'lucide-react';
+import { StudentLogModal } from '@/components/student-log-modal';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 interface Student {
@@ -190,6 +193,9 @@ export default function AttendancePage() {
   // Schedule state
   const [todaySchedule, setTodaySchedule] = useState<ScheduleEvent[]>([]);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [selectedStudentForLog, setSelectedStudentForLog] = useState<{id: string, name: string} | null>(null);
+  const router = useRouter();
 
   const fetchGroups = async () => {
     try {
@@ -869,9 +875,12 @@ export default function AttendancePage() {
                       <TableRow 
                         key={student.id} 
                         className={cn(
+                          "cursor-pointer hover:bg-slate-50 transition-colors",
                           needsNotification && sendWhatsApp ? 'bg-green-50/30' : '',
                           isSelected ? 'bg-blue-50/50' : ''
                         )}
+                        onDoubleClick={() => router.push(`/dashboard/student-profile?id=${student.id}`)}
+                        title="Double-cliquez pour voir le profil complet"
                       >
                         <TableCell>
                           <Checkbox
@@ -1008,9 +1017,24 @@ export default function AttendancePage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button variant="outline" size="sm" onClick={() => openActionDialog(student)} className="text-xs">
-                            Actions
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStudentForLog({ id: student.id, name: student.fullName });
+                                setLogModalOpen(true);
+                              }}
+                            >
+                              <Settings2 className="w-3.5 h-3.5 mr-1" />
+                              Organiser
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openActionDialog(student)} className="text-xs">
+                              Actions
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -1133,6 +1157,16 @@ export default function AttendancePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Log Modal */}
+      {selectedStudentForLog && (
+        <StudentLogModal
+          open={logModalOpen}
+          onOpenChange={setLogModalOpen}
+          studentId={selectedStudentForLog.id}
+          studentName={selectedStudentForLog.name}
+        />
+      )}
 
       {/* Help Card */}
       <Card className="border-0 shadow-md bg-blue-50">
