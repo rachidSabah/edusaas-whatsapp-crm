@@ -1,176 +1,86 @@
-export const runtime = 'edge';
-
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { processIncomingMessage } from '@/lib/whatsapp';
 import { getDbContext } from '@/lib/db-context';
-import { createWhatsAppService, type WhatsAppConfig } from '@/modules/whatsapp';
 
-/**
- * WhatsApp Webhook Endpoint
- * Receives messages from WhatsApp provider (Evolution API, etc.)
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    // Log incoming webhook for debugging
-    console.log('WhatsApp Webhook received:', JSON.stringify(body, null, 2));
+// REQUIRED FOR CLOUDFLARE PAGES: This tells Next.js to use the Edge runtime instead of Node.js
+export const runtime = 'edge'; 
 
-    // Extract organization ID from webhook (could be in headers or body)
-    const organizationId = request.headers.get('x-organization-id') || 
-                           body.organizationId || 
-                           body.instance;
+// You will put this same exact string into the Meta Dashboard later
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'my_super_secret_verify_token_123';
 
-    if (!organizationId) {
-      return NextResponse.json(
-        { error: 'Organization ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Get database context
-    const db = getDbContext();
-
-    // Get WhatsApp configuration for this organization
-    const configs = await db.query<{
-      id: string;
-      provider: string;
-      apiUrl: string;
-      apiKey: string;
-      instanceId: string | null;
-      aiEnabled: number;
-    }>(
-      `SELECT id, provider, apiUrl, apiKey, instanceId, aiEnabled 
-       FROM whatsapp_accounts 
-       WHERE organizationId = ? AND isActive = 1`,
-      [organizationId]
-    );
-
-    if (configs.length === 0) {
-      return NextResponse.json(
-        { error: 'No WhatsApp configuration found' },
-        { status: 404 }
-      );
-    }
-
-    const config = configs[0];
-
-    // Create WhatsApp service
-    const waConfig: WhatsAppConfig = {
-      provider: config.provider as 'evolution' | 'business-api' | 'custom',
-      apiUrl: config.apiUrl,
-      apiKey: config.apiKey,
-      instanceId: config.instanceId || undefined,
-      organizationId,
-      aiEnabled: config.aiEnabled === 1,
-      autoReplyEnabled: config.aiEnabled === 1,
-    };
-
-    const waService = createWhatsAppService(waConfig);
-
-    // Parse the incoming message
-    const message = waService.handleWebhook(body);
-
-    if (!message) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Webhook processed (no action needed)' 
-      });
-    }
-
-    // Skip messages from us (outgoing)
-    if (message.isFromMe) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Outgoing message ignored' 
-      });
-    }
-
-    // Find or create contact
-    let contactId: string | null = null;
-    const contacts = await db.query<{ id: string; name: string }>(
-      `SELECT id, name FROM contacts WHERE organizationId = ? AND phone LIKE ?`,
-      [organizationId, `%${message.from}%`]
-    );
-
-    if (contacts.length > 0) {
-      contactId = contacts[0].id;
-    } else {
-      // Create new contact
-      contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      await db.execute(
-        `INSERT INTO contacts (id, organizationId, phone, name, tags, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'PROSPECT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [contactId, organizationId, message.from, message.from]
-      );
-    }
-
-    // Store incoming message
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    await db.execute(
-      `INSERT INTO messages (id, organizationId, contactId, content, direction, status, createdAt)
-       VALUES (?, ?, ?, ?, 'inbound', 'received', CURRENT_TIMESTAMP)`,
-      [messageId, organizationId, contactId, message.body]
-    );
-
-    // Process with AI if enabled
-    if (waConfig.aiEnabled) {
-      const context = {
-        message,
-        organizationId,
-        contact: contacts[0] ? { name: contacts[0].name, number: message.from } : undefined,
-      };
-
-      const autoReply = await waService.processIncomingMessage(context);
-
-      if (autoReply) {
-        // Send auto-reply
-        await waService.sendTextMessage(message.from, autoReply);
-
-        // Store outgoing message
-        const replyId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await db.execute(
-          `INSERT INTO messages (id, organizationId, contactId, content, direction, status, createdAt)
-           VALUES (?, ?, ?, ?, 'outbound', 'sent', CURRENT_TIMESTAMP)`,
-          [replyId, organizationId, contactId, autoReply]
-        );
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Webhook processed successfully',
-      data: {
-        messageId,
-        contactId,
-        autoReplied: waConfig.aiEnabled,
-      }
-    });
-  } catch (error: any) {
-    console.error('WhatsApp webhook error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * Webhook verification endpoint (for setup)
- */
-export async function GET(request: NextRequest) {
+// 1. GET Request: Meta uses this to verify your webhook URL is working
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  // Verify webhook token (if using WhatsApp Business API)
-  if (mode === 'subscribe' && token) {
-    // In production, verify the token against stored value
-    return new Response(challenge, { status: 200 });
+  // Check if a request is from Meta and the token matches
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('WEBHOOK_VERIFIED successfully!');
+    // Meta requires us to return the challenge string as plain text
+    return new NextResponse(challenge, { status: 200 });
+  } else {
+    return new NextResponse('Forbidden: Invalid Token', { status: 403 });
   }
+}
 
-  return NextResponse.json({
-    status: 'WhatsApp webhook endpoint active',
-    timestamp: new Date().toISOString()
-  });
+// 2. POST Request: Meta sends the actual WhatsApp messages here
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    // Verify this is a WhatsApp API event
+    if (body.object === 'whatsapp_business_account') {
+      for (const entry of body.entry) {
+        for (const change of entry.changes) {
+          const message = change.value.messages?.[0];
+          const contact = change.value.contacts?.[0];
+          const metadata = change.value.metadata;
+
+          if (message && contact && metadata) {
+            console.log('🔔 New WhatsApp Message Received!');
+            console.log('From Phone Number:', contact?.wa_id);
+            console.log('Message Content:', message.text?.body);
+            
+            try {
+              const db = getDbContext();
+              
+              // 1. Try to find the organization using this phone number
+              const orgs = await db.query<{id: string}>(
+                `SELECT id FROM organizations WHERE whatsappPhone = ? OR whatsappSessionId = ? LIMIT 1`,
+                [metadata.display_phone_number, metadata.phone_number_id]
+              );
+              
+              // Fallback to the first organization for testing purposes if none match
+              const organizationId = orgs[0]?.id || (await db.query<{id: string}>(`SELECT id FROM organizations LIMIT 1`))[0]?.id;
+              
+              if (organizationId) {
+                // 2. Save the message to the database
+                await processIncomingMessage({
+                  organizationId,
+                  from: contact.wa_id,
+                  message: message.text?.body || '',
+                  messageId: message.id,
+                  mediaType: message.type,
+                });
+                console.log('✅ Message successfully saved to database!');
+              }
+            } catch (dbError) {
+              console.error('Database error while saving message:', dbError);
+            }
+          }
+        }
+      }
+      
+      // We must always return a 200 OK so Meta knows we received the message
+      return new NextResponse('EVENT_RECEIVED', { status: 200 });
+    } else {
+      return new NextResponse('Not a WhatsApp event', { status: 404 });
+    }
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
 }
