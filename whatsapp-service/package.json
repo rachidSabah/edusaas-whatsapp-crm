@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "WhatsApp Baileys Microservice",
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@libsql/client": "^0.6.0",
+    "@whiskeysockets/baileys": "^6.5.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pino": "^9.0.0"
+  }
+}
