@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: edusaas-whatsapp-baileys
+    env: node
+    buildCommand: cd mini-services/whatsapp-service && npm install
+    startCommand: cd mini-services/whatsapp-service && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0
+      - key: TURSO_DATABASE_URL
+        value: libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io
+      - key: TURSO_AUTH_TOKEN
+        value: eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM0MjY4NDUsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.RcVzrufFc7a9vWXct57oWdGyveBC1u4XGfTLTQ8T-zh5yMweFiZL-zaR88Iqhmnsk0N1Q0qc0e_N7bV6JPIIDw
+      - key: PORT
+        value: 10000
