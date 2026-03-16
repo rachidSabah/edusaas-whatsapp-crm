@@ -69,8 +69,8 @@ export interface MetaWebhookPayload {
  */
 export class MetaWhatsAppProvider {
   private config: MetaConfig;
-  private apiVersion = 'v18.0';
-  private apiUrl = 'https://graph.instagram.com';
+  private apiVersion = 'v22.0';
+  private apiUrl = 'https://graph.facebook.com';
 
   constructor(config: MetaConfig) {
     this.config = config;
