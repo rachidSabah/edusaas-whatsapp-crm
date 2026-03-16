@@ -20,12 +20,20 @@ export interface DbContext {
 export function getDbContext(): DbContext {
   let env: CloudflareEnv | null = null;
   
-nst jwtSecret = getJwtSecret(env);
+  try {
+    const ctx = getRequestContext();
+    env = ctx.env as CloudflareEnv;
+  } catch {
+    // Not in Cloudflare context
+  }
+  
+  const { url: dbUrl, token: dbToken } = getFallbackCredentials(env);
+  const jwtSecret = getJwtSecret(env);
   
   return {
     dbUrl,
     dbToken,
-S   
+    jwtSecret,
     // Query helper that returns parsed results
     query: async <T = Record<string, any>>(sql: string, args: any[] = []): Promise<T[]> => {
       return tursoQuery<T>(dbUrl, dbToken, sql, args);
