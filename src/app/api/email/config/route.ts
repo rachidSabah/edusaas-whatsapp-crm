@@ -16,6 +16,10 @@ interface EmailConfig {
   imapPort: number;
   imapUser: string | null;
   imapPassword: string | null;
+  popHost: string | null;
+  popPort: number | null;
+  popUser: string | null;
+  popPassword: string | null;
   brevoApiKey: string | null;
   gmailClientId: string | null;
   gmailClientSecret: string | null;
@@ -48,6 +52,7 @@ export async function GET(request: NextRequest) {
       ...config,
       smtpPassword: config.smtpPassword ? '••••••••' : null,
       imapPassword: config.imapPassword ? '••••••••' : null,
+      popPassword: config.popPassword ? '••••••••' : null,
       brevoApiKey: config.brevoApiKey ? '••••••••' : null,
       gmailClientSecret: config.gmailClientSecret ? '••••••••' : null,
       gmailRefreshToken: config.gmailRefreshToken ? '••••••••' : null,
@@ -106,6 +111,11 @@ export async function POST(request: NextRequest) {
       imapPort,
       imapUser,
       imapPassword,
+      // POP settings
+      popHost,
+      popPort,
+      popUser,
+      popPassword,
       // Provider-specific
       brevoApiKey,
       gmailClientId,
@@ -148,6 +158,13 @@ export async function POST(request: NextRequest) {
       if (imapPassword && !imapPassword.startsWith('•')) { 
         updates.push('imapPassword = ?'); 
         args.push(imapPassword); 
+      }
+      if (popHost !== undefined) { updates.push('popHost = ?'); args.push(popHost); }
+      if (popPort !== undefined) { updates.push('popPort = ?'); args.push(popPort); }
+      if (popUser !== undefined) { updates.push('popUser = ?'); args.push(popUser); }
+      if (popPassword && !popPassword.startsWith('•')) { 
+        updates.push('popPassword = ?'); 
+        args.push(popPassword); 
       }
       if (brevoApiKey && !brevoApiKey.startsWith('•')) { 
         updates.push('brevoApiKey = ?'); 
@@ -213,10 +230,10 @@ export async function POST(request: NextRequest) {
     await db.execute(
       `INSERT INTO email_config 
        (id, organizationId, provider, smtpHost, smtpPort, smtpUser, smtpPassword,
-        imapHost, imapPort, imapUser, imapPassword, brevoApiKey, 
+        imapHost, imapPort, imapUser, imapPassword, popHost, popPort, popUser, popPassword, brevoApiKey, 
         gmailClientId, gmailClientSecret, gmailRefreshToken,
         fromEmail, fromName, isDefault, isActive, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [
         newId,
         user.organizationId,
@@ -229,6 +246,10 @@ export async function POST(request: NextRequest) {
         imapPort || 993,
         imapUser || null,
         imapPassword || null,
+        popHost || null,
+        popPort || 995,
+        popUser || null,
+        popPassword || null,
         brevoApiKey || null,
         gmailClientId || null,
         gmailClientSecret || null,
