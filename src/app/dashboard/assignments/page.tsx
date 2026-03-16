@@ -340,39 +340,31 @@ export default function AssignmentsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="assignedToId">Assigner à</Label>
-                  <Select
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     value={formData.assignedToId}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, assignedToId: v }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, assignedToId: e.target.value }))}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Non assigné</SelectItem>
-                      {Array.isArray(users) && users.map((u) => (
-                        <SelectItem key={u.id} value={u.id || ''}>
-                          {u.name || u.email || 'Utilisateur sans nom'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <option value="">Non assigné</option>
+                    {Array.isArray(users) && users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email || 'Utilisateur sans nom'}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priorité</Label>
-                  <Select
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     value={formData.priority}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, priority: v }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key || ''}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -529,28 +521,26 @@ export default function AssignmentsPage() {
                 className="bg-slate-50"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key || ''}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les priorités</SelectItem>
-                {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key || ''}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              className="flex h-9 w-full sm:w-48 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">Tous les statuts</option>
+              {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <select
+              className="flex h-9 w-full sm:w-48 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+            >
+              <option value="all">Toutes les priorités</option>
+              {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
           </div>
         </CardContent>
       </Card>
