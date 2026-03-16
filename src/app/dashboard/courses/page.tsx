@@ -90,7 +90,7 @@ export default function CoursesPage() {
         setEditingCourse(null);
         setFormData({ name: '', code: '', description: '', duration: '', fee: '' });
         // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchCourses();
       } else {
         const data = await response.json();
