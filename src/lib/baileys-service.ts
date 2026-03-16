@@ -68,7 +68,43 @@ export class BaileysSessionService {
         [phoneNumber]
       );
 
-      return result.length > 0 ? result[0] : null;
+      if (result.length > 0) {
+        const session = result[0];
+        
+        // If QR code is missing in baileys_sessions, try to get it from organizations
+        if (!session.qrCode) {
+          const orgResult = await this.db.query<{ whatsappQRCode: string }>(
+            `SELECT whatsappQRCode FROM organizations WHERE id = ?`,
+            [phoneNumber]
+          );
+          if (orgResult.length > 0 && orgResult[0].whatsappQRCode) {
+            session.qrCode = orgResult[0].whatsappQRCode;
+          }
+        }
+        
+        return session;
+      }
+
+      // If no session in baileys_sessions, check if we have a QR code in organizations
+      const orgResult = await this.db.query<{ whatsappQRCode: string }>(
+        `SELECT whatsappQRCode FROM organizations WHERE id = ?`,
+        [phoneNumber]
+      );
+      
+      if (orgResult.length > 0 && orgResult[0].whatsappQRCode) {
+        return {
+          id: `baileys_${phoneNumber}`,
+          phoneNumber,
+          sessionData: '{}',
+          qrCode: orgResult[0].whatsappQRCode,
+          status: 'connecting',
+          lastActivity: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        } as BaileysSession;
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting Baileys session:', error);
       return null;
