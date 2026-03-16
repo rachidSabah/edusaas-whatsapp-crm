@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BookOpen, Plus, Edit, Trash2, Search, Sparkles } from 'lucide-react';
+import { BookOpen, Plus, Edit, Trash2, Search, Sparkles, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { KNOWLEDGE_CATEGORY_LABELS } from '@/lib/constants';
 
 interface KnowledgeEntry {
@@ -36,6 +37,15 @@ interface KnowledgeEntry {
   createdAt: string;
 }
 
+interface UploadedFile {
+  name: string;
+  size: number;
+  type: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
+
 export default function KnowledgeBasePage() {
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +53,11 @@ export default function KnowledgeBasePage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragAreaRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     question: '',
     answer: '',
@@ -121,6 +136,137 @@ export default function KnowledgeBasePage() {
       priority: entry.priority,
     });
     setDialogOpen(true);
+  };
+
+  // Drag and Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.add('bg-blue-50', 'border-blue-400');
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.remove('bg-blue-50', 'border-blue-400');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.remove('bg-blue-50', 'border-blue-400');
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    handleFiles(files);
+  };
+
+  const handleFiles = async (files: File[]) => {
+    const validTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+    ];
+
+    const newFiles: UploadedFile[] = files
+      .filter((file) => validTypes.includes(file.type))
+      .map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        progress: 0,
+        status: 'pending' as const,
+      }));
+
+    if (files.some((f) => !validTypes.includes(f.type))) {
+      setUploadMessage({
+        type: 'error',
+        text: 'Certains fichiers ne sont pas supportés. Utilisez PDF, DOCX, TXT ou images.',
+      });
+    }
+
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
+
+    // Process each file
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) continue;
+      await processFile(file);
+    }
+  };
+
+  const processFile = async (file: File) => {
+    try {
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, status: 'uploading' as const, progress: 30 } : f
+        )
+      );
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/whatsapp/knowledge-base/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+
+      // Add extracted items to knowledge base
+      if (data.items && data.items.length > 0) {
+        // Refresh entries to show new items
+        fetchEntries();
+      }
+
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name
+            ? { ...f, status: 'success' as const, progress: 100 }
+            : f
+        )
+      );
+
+      setUploadMessage({
+        type: 'success',
+        text: `${file.name} traité avec succès. ${data.items?.length || 0} Q&R extraites.`,
+      });
+    } catch (error) {
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name
+            ? {
+                ...f,
+                status: 'error' as const,
+                error: 'Erreur lors du traitement',
+              }
+            : f
+        )
+      );
+
+      setUploadMessage({
+        type: 'error',
+        text: `Erreur lors du traitement de ${file.name}`,
+      });
+    }
+
+    setTimeout(() => setUploadMessage(null), 5000);
   };
 
   const getCategoryBadge = (category: string) => {
@@ -235,6 +381,103 @@ export default function KnowledgeBasePage() {
         </Dialog>
       </div>
 
+      {/* Messages */}
+      {uploadMessage && (
+        <Alert className={uploadMessage.type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
+          {uploadMessage.type === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-600" />
+          )}
+          <AlertTitle className={uploadMessage.type === 'success' ? 'text-green-900' : 'text-red-900'}>
+            {uploadMessage.type === 'success' ? 'Succès' : 'Erreur'}
+          </AlertTitle>
+          <AlertDescription className={uploadMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+            {uploadMessage.text}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Upload Section */}
+      <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-blue-600" />
+            Importer des Documents
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Drag & Drop Area */}
+          <div
+            ref={dragAreaRef}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-blue-400 hover:bg-blue-50"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <FileText className="w-12 h-12 text-blue-400" />
+              <div>
+                <p className="font-semibold text-slate-900">Déposez vos fichiers ici</p>
+                <p className="text-sm text-slate-600">ou cliquez pour sélectionner</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Formats supportés: PDF, DOCX, TXT, JPG, PNG, GIF (Max 10MB)
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.gif"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-4"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Sélectionner des fichiers
+            </Button>
+          </div>
+
+          {/* Uploaded Files List */}
+          {uploadedFiles.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-900">Fichiers en cours</h3>
+              {uploadedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+                  <FileText className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(2)} KB</p>
+                  </div>
+                  {file.status === 'uploading' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 transition-all"
+                          style={{ width: `${file.progress}%` }}
+                        />
+                      </div>
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    </div>
+                  )}
+                  {file.status === 'success' && (
+                    <Badge className="bg-green-100 text-green-700">✓ Traité</Badge>
+                  )}
+                  {file.status === 'error' && (
+                    <Badge className="bg-red-100 text-red-700">✗ Erreur</Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card className="border-0 shadow-md">
         <CardContent className="pt-6">
@@ -285,7 +528,7 @@ export default function KnowledgeBasePage() {
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <Sparkles className="w-5 h-5 text-green-500" />
                       <p className="font-medium text-slate-900">{entry.question}</p>
                       {getCategoryBadge(entry.category)}
