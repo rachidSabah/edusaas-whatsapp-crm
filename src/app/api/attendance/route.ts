@@ -94,14 +94,94 @@ async function getTemplateForAction(
   return systemTemplates.length > 0 ? systemTemplates[0] : null;
 }
 
-// Send WhatsApp message (internal function)
+// Send WhatsApp message via Meta API
 async function sendWhatsAppMessage(
   db: ReturnType<typeof getDbContext>,
   organizationId: string,
   to: string,
-  message: string
+  message: string,
+  templateName?: string,
+  templateParams?: any[]
 ): Promise<{ success: boolean; messageId?: string }> {
   try {
+    // Get Meta configuration
+    const configs = await db.query<{
+      phoneNumberId: string;
+      accessToken: string;
+    }>(
+      `SELECT phoneNumberId, accessToken FROM whatsapp_meta_numbers 
+       WHERE organizationId = ? AND isPrimary = 1 LIMIT 1`,
+      [organizationId]
+    );
+
+    // Fallback to default if no primary found
+    let metaConfig = configs[0];
+    if (!metaConfig) {
+      const allConfigs = await db.query<{
+        phoneNumberId: string;
+        accessToken: string;
+      }>(
+        `SELECT phoneNumberId, accessToken FROM whatsapp_meta_numbers 
+         WHERE organizationId = ? LIMIT 1`,
+        [organizationId]
+      );
+      metaConfig = allConfigs[0];
+    }
+
+    if (!metaConfig) {
+      console.error('No Meta WhatsApp configuration found for organization:', organizationId);
+      return { success: false };
+    }
+
+    const formattedPhone = to.replace(/[^0-9]/g, '');
+    
+    let payload: any;
+    if (templateName) {
+      payload = {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: 'fr' },
+          components: templateParams ? [
+            {
+              type: 'body',
+              parameters: templateParams
+            }
+          ] : []
+        }
+      };
+    } else {
+      payload = {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'text',
+        text: { body: message }
+      };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v22.0/${metaConfig.phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${metaConfig.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Meta API error:', result.error?.message);
+      return { success: false };
+    }
+
+    const messageId = result.messages?.[0]?.id;
+
     // Find or create contact
     let contactId: string | null = null;
     const contacts = await db.query<{ id: string }>(
@@ -137,10 +217,10 @@ async function sendWhatsAppMessage(
     }
 
     // Store outgoing message
-    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const msgId = messageId || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     await db.execute(
       `INSERT INTO messages (id, organizationId, conversationId, content, direction, status) VALUES (?, ?, ?, ?, 'outbound', 'sent')`,
-      [msgId, organizationId, conversationId, message]
+      [msgId, organizationId, conversationId, templateName ? `[Template: ${templateName}] ${message}` : message]
     );
 
     // Update conversation
@@ -360,146 +440,132 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { records } = body;
 
-    if (!Array.isArray(records) || records.length === 0) {
+    if (!records || !Array.isArray(records)) {
       return NextResponse.json(
-        { error: 'Attendance records are required' },
+        { error: 'Invalid records format' },
         { status: 400 }
       );
     }
 
-    // Get organization info
-    const orgResult = await db.query<{ name: string }>(
+    const results = [];
+    const notificationsSent = [];
+
+    // Get organization name for templates
+    const orgs = await db.query<{ name: string }>(
       `SELECT name FROM organizations WHERE id = ?`,
       [user.organizationId]
     );
-    const orgName = orgResult[0]?.name || 'Administration';
-
-    const results = [];
-    const notificationsSent: { studentName: string; phone: string; status: string }[] = [];
+    const orgName = orgs[0]?.name || 'Administration';
 
     for (const record of records) {
       const { studentId, date, status, notes, groupId, session, notifyParent, sendWhatsApp, notifyParents } = record;
       // notifyParents can be: 'parent1', 'parent2', 'both', or undefined (default: all WhatsApp-enabled parents)
 
-      if (!studentId || !date || !status) {
-        continue;
-      }
+      if (!studentId || !date || !status) continue;
 
-      // Get student with parent info (including new parent fields)
-      const students = await db.query<{
-        id: string;
-        firstName: string;
-        lastName: string;
-        fullName: string;
-        groupId: string | null;
-        parentId: string | null;
-        parentName: string | null;
-        parentPhone: string | null;
-        groupName: string | null;
-        parent1Name: string | null;
-        parent1Phone: string | null;
-        parent1Whatsapp: number;
-        parent2Name: string | null;
-        parent2Phone: string | null;
-        parent2Whatsapp: number;
-      }>(
-        `SELECT s.id, s.firstName, s.lastName, s.fullName, s.groupId, s.parentId, 
-                p.fullName as parentName, p.phone as parentPhone, g.name as groupName,
-                s.parent1Name, s.parent1Phone, s.parent1Whatsapp,
-                s.parent2Name, s.parent2Phone, s.parent2Whatsapp
-         FROM students s
-         LEFT JOIN parents p ON s.parentId = p.id
-         LEFT JOIN groups g ON s.groupId = g.id
-         WHERE s.id = ? AND s.organizationId = ?`,
-        [studentId, user.organizationId]
-      );
-
-      if (students.length === 0) {
-        continue;
-      }
-
-      const student = students[0];
-
-      // Check if attendance record exists
-      const existing = await db.query<{ id: string; parentNotified: number }>(
-        `SELECT id, parentNotified FROM attendance WHERE organizationId = ? AND studentId = ? AND date = ?`,
+      // Check if record already exists for this student and date
+      const existing = await db.query<{ id: string }>(
+        `SELECT id FROM attendance WHERE organizationId = ? AND studentId = ? AND date = ?`,
         [user.organizationId, studentId, date]
       );
 
       let attendanceId: string;
-      let alreadyNotified = false;
 
       if (existing.length > 0) {
         attendanceId = existing[0].id;
-        alreadyNotified = existing[0].parentNotified === 1;
         await db.execute(
-          `UPDATE attendance SET status = ?, notes = ?, markedById = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
-          [status, notes || null, user.id, attendanceId]
+          `UPDATE attendance SET status = ?, notes = ?, groupId = ?, session = ?, markedById = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+          [status, notes || null, groupId || null, session || null, user.id, attendanceId]
         );
       } else {
         attendanceId = `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await db.execute(
-          `INSERT INTO attendance (id, organizationId, studentId, groupId, date, session, status, notes, markedById, parentNotified)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-          [attendanceId, user.organizationId, studentId, groupId || student.groupId, date, session || null, status, notes || null, user.id]
+          `INSERT INTO attendance (id, organizationId, studentId, groupId, date, session, status, notes, markedById)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [attendanceId, user.organizationId, studentId, groupId || null, date, session || null, status, notes || null, user.id]
         );
       }
 
-      // Auto-send WhatsApp message based on status
+      // Handle WhatsApp notification if requested
       const triggerAction = STATUS_TO_TRIGGER[status];
-      const shouldSendWhatsApp = (sendWhatsApp || notifyParent) && !alreadyNotified && triggerAction;
+      if (sendWhatsApp && triggerAction) {
+        // Get student and parent info
+        const students = await db.query<{
+          id: string;
+          fullName: string;
+          parentName: string | null;
+          parentPhone: string | null;
+          parent1Name: string | null;
+          parent1Phone: string | null;
+          parent1Whatsapp: number;
+          parent2Name: string | null;
+          parent2Phone: string | null;
+          parent2Whatsapp: number;
+          groupName: string | null;
+        }>(
+          `SELECT s.id, s.fullName, p.fullName as parentName, p.phone as parentPhone,
+                  s.parent1Name, s.parent1Phone, s.parent1Whatsapp,
+                  s.parent2Name, s.parent2Phone, s.parent2Whatsapp,
+                  g.name as groupName
+           FROM students s
+           LEFT JOIN parents p ON s.parentId = p.id
+           LEFT JOIN groups g ON s.groupId = g.id
+           WHERE s.id = ? AND s.organizationId = ?`,
+          [studentId, user.organizationId]
+        );
 
-      if (shouldSendWhatsApp) {
-        const template = await getTemplateForAction(db, user.organizationId, triggerAction);
-        
-        if (template) {
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-          const dateStr = new Date(date).toLocaleDateString('fr-FR', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          });
-
-          const variables: Record<string, string> = {
-            StudentName: student.fullName,
-            FirstName: student.firstName,
-            LastName: student.lastName,
-            GroupName: student.groupName || 'Non assigné',
-            Date: dateStr,
-            Time: timeStr,
-            ParentName: student.parentName || student.parent1Name || '',
-            organisation: orgName,
-          };
-
-          const message = processTemplateContent(template.content, template.signature, variables);
-          
-          // Collect parent phones to notify based on selection
-          const parentPhones: { phone: string; name: string }[] = [];
+        if (students.length > 0) {
+          const student = students[0];
           
           // Determine which parents to notify based on notifyParents parameter
           const shouldNotifyParent1 = notifyParents === 'parent1' || notifyParents === 'both' || !notifyParents;
           const shouldNotifyParent2 = notifyParents === 'parent2' || notifyParents === 'both' || !notifyParents;
           
-          // Add parent1 if WhatsApp is enabled and selected
+          const parentPhones: { phone: string; name: string | null }[] = [];
+          
           if (shouldNotifyParent1 && student.parent1Phone && student.parent1Whatsapp === 1) {
-            parentPhones.push({ phone: student.parent1Phone, name: student.parent1Name || 'Parent 1' });
+            parentPhones.push({ phone: student.parent1Phone, name: student.parent1Name });
           }
           
-          // Add parent2 if WhatsApp is enabled and selected
           if (shouldNotifyParent2 && student.parent2Phone && student.parent2Whatsapp === 1) {
-            parentPhones.push({ phone: student.parent2Phone, name: student.parent2Name || 'Parent 2' });
+            parentPhones.push({ phone: student.parent2Phone, name: student.parent2Name });
           }
           
-          // Fallback to legacy parent if no new parents configured
+          // Fallback to legacy parent if no new parents found
           if (parentPhones.length === 0 && student.parentPhone) {
-            parentPhones.push({ phone: student.parentPhone, name: student.parentName || 'Parent' });
+            parentPhones.push({ phone: student.parentPhone, name: student.parentName });
           }
+
+          // Get template
+          const template = await getTemplateForAction(db, user.organizationId, triggerAction);
           
-          // Send to all selected parents
+          // Get absence config for Meta template name
+          const absenceConfigs = await db.query<{ templateName: string }>(
+            `SELECT templateName FROM absence_notification_config WHERE organizationId = ? AND isEnabled = 1`,
+            [user.organizationId]
+          );
+          const metaTemplateName = absenceConfigs[0]?.templateName || (triggerAction === 'ABSENT' ? 'student_absence' : 'student_late');
+
+          const message = template 
+            ? processTemplateContent(template.content, template.signature, {
+                eleve: student.fullName,
+                date: date,
+                statut: status === 'ABSENT' ? 'absent(e)' : 'en retard',
+                organisation: orgName,
+                groupe: student.groupName || '',
+              })
+            : `Notification: ${student.fullName} est marqué ${status === 'ABSENT' ? 'absent(e)' : 'en retard'} le ${date}.`;
+
           for (const parentInfo of parentPhones) {
-            const result = await sendWhatsAppMessage(db, user.organizationId, parentInfo.phone, message);
+            // Send via Meta API
+            const result = await sendWhatsAppMessage(
+              db, 
+              user.organizationId, 
+              parentInfo.phone, 
+              message,
+              metaTemplateName,
+              [{ type: 'text', text: student.fullName }]
+            );
             
             if (result.success) {
               // Log the notification
@@ -559,8 +625,8 @@ export async function POST(request: NextRequest) {
             fullName: att.studentFullName,
             firstName: att.firstName,
             lastName: att.lastName,
-            parent: student.parentName ? { fullName: student.parentName, phone: student.parentPhone } : null,
-            group: student.groupName ? { name: student.groupName } : null,
+            parent: students[0]?.parentName ? { fullName: students[0].parentName, phone: students[0].parentPhone } : null,
+            group: students[0]?.groupName ? { name: students[0].groupName } : null,
           },
         });
       }

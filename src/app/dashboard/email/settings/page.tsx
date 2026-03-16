@@ -38,6 +38,7 @@ import {
   Mail,
   Key,
   Shield,
+  Download,
 } from 'lucide-react';
 
 interface EmailConfig {
@@ -68,7 +69,7 @@ interface EmailConfig {
 }
 
 const PROVIDERS = [
-  { value: 'smtp', label: 'Serveur SMTP', description: 'Configuration SMTP personnalisée', icon: Server },
+  { value: 'smtp', label: 'Serveur SMTP / IMAP', description: 'Configuration personnalisée', icon: Server },
   { value: 'brevo', label: 'Brevo (Sendinblue)', description: 'Service email transactionnel', icon: Mail },
   { value: 'mailchimp', label: 'Mailchimp', description: 'Mailchimp Transactional', icon: Mail },
   { value: 'gmail', label: 'Gmail', description: 'Compte Gmail via OAuth2', icon: Mail },
@@ -266,7 +267,7 @@ export default function EmailSettingsPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Configuration Email</h1>
-          <p className="text-slate-500">Configurez vos fournisseurs email</p>
+          <p className="text-slate-500">Configurez vos fournisseurs email pour l'envoi et la réception</p>
         </div>
       </div>
 
@@ -325,7 +326,7 @@ export default function EmailSettingsPage() {
             {formData.id ? 'Modifier la configuration' : 'Nouvelle configuration'}
           </CardTitle>
           <CardDescription>
-            Configurez votre fournisseur email pour l&apos;envoi et la réception
+            Configurez votre fournisseur email pour l&apos;envoi (SMTP) et la réception (IMAP/POP)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -370,56 +371,143 @@ export default function EmailSettingsPage() {
           </div>
 
           {(formData.provider === 'smtp' || formData.provider === 'microsoft') && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Server className="w-4 h-4" />
-                  Configuration SMTP
-                </CardTitle>
-                <CardDescription>Paramètres du serveur d&apos;envoi</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="smtpHost">Hôte SMTP</Label>
-                    <Input
-                      id="smtpHost"
-                      value={formData.smtpHost}
-                      onChange={function(e) { setFormData({...formData, smtpHost: e.target.value}); }}
-                      placeholder="smtp.example.com"
-                    />
+            <div className="space-y-6">
+              {/* SMTP Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Server className="w-4 h-4" />
+                    Configuration SMTP (Envoi)
+                  </CardTitle>
+                  <CardDescription>Paramètres du serveur d&apos;envoi</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="smtpHost">Hôte SMTP</Label>
+                      <Input
+                        id="smtpHost"
+                        value={formData.smtpHost}
+                        onChange={function(e) { setFormData({...formData, smtpHost: e.target.value}); }}
+                        placeholder="smtp.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPort">Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={formData.smtpPort}
+                        onChange={function(e) { setFormData({...formData, smtpPort: parseInt(e.target.value) || 587}); }}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPort">Port</Label>
-                    <Input
-                      id="smtpPort"
-                      type="number"
-                      value={formData.smtpPort}
-                      onChange={function(e) { setFormData({...formData, smtpPort: parseInt(e.target.value) || 587}); }}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpUser">Utilisateur SMTP</Label>
+                      <Input
+                        id="smtpUser"
+                        value={formData.smtpUser}
+                        onChange={function(e) { setFormData({...formData, smtpUser: e.target.value}); }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPassword">Mot de passe SMTP</Label>
+                      <Input
+                        id="smtpPassword"
+                        type="password"
+                        value={formData.smtpPassword}
+                        onChange={function(e) { setFormData({...formData, smtpPassword: e.target.value}); }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpUser">Utilisateur</Label>
-                    <Input
-                      id="smtpUser"
-                      value={formData.smtpUser}
-                      onChange={function(e) { setFormData({...formData, smtpUser: e.target.value}); }}
-                    />
+                </CardContent>
+              </Card>
+
+              {/* IMAP Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Configuration IMAP (Réception)
+                  </CardTitle>
+                  <CardDescription>Paramètres pour recevoir les emails dans le CRM</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="imapHost">Hôte IMAP</Label>
+                      <Input
+                        id="imapHost"
+                        value={formData.imapHost}
+                        onChange={function(e) { setFormData({...formData, imapHost: e.target.value}); }}
+                        placeholder="imap.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapPort">Port</Label>
+                      <Input
+                        id="imapPort"
+                        type="number"
+                        value={formData.imapPort}
+                        onChange={function(e) { setFormData({...formData, imapPort: parseInt(e.target.value) || 993}); }}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPassword">Mot de passe</Label>
-                    <Input
-                      id="smtpPassword"
-                      type="password"
-                      value={formData.smtpPassword}
-                      onChange={function(e) { setFormData({...formData, smtpPassword: e.target.value}); }}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="imapUser">Utilisateur IMAP</Label>
+                      <Input
+                        id="imapUser"
+                        value={formData.imapUser}
+                        onChange={function(e) { setFormData({...formData, imapUser: e.target.value}); }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapPassword">Mot de passe IMAP</Label>
+                      <Input
+                        id="imapPassword"
+                        type="password"
+                        value={formData.imapPassword}
+                        onChange={function(e) { setFormData({...formData, imapPassword: e.target.value}); }}
+                      />
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* POP Section (Optional) */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-slate-500">
+                    <Download className="w-4 h-4" />
+                    Configuration POP3 (Alternative)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="popHost">Hôte POP</Label>
+                      <Input
+                        id="popHost"
+                        value={formData.popHost}
+                        onChange={function(e) { setFormData({...formData, popHost: e.target.value}); }}
+                        placeholder="pop.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="popPort">Port</Label>
+                      <Input
+                        id="popPort"
+                        type="number"
+                        value={formData.popPort}
+                        onChange={function(e) { setFormData({...formData, popPort: parseInt(e.target.value) || 995}); }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {formData.provider === 'brevo' && (
