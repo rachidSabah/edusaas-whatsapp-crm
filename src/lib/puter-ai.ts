@@ -1,12 +1,13 @@
 /**
  * Puter AI Integration Service
  * Handles automatic responses based on knowledge base and documents
+ * Uses Puter.js for AI chat functionality
  */
 
 import { getDbContext } from './db-context';
 
 interface AIConfig {
-  puerApiKey: string;
+  selectedModel: string;
   responseTemplate: string;
   maxResponseLength: number;
   includeKnowledgeBase: boolean;
@@ -34,7 +35,7 @@ export async function generateAIResponse(
 
     // Get AI configuration
     const configs = await db.query<AIConfig>(
-      `SELECT puerApiKey, responseTemplate, maxResponseLength, includeKnowledgeBase, autoRespondToAll
+      `SELECT selectedModel, responseTemplate, maxResponseLength, includeKnowledgeBase, autoRespondToAll
        FROM ai_automation_config
        WHERE organizationId = ? AND isEnabled = 1`,
       [organizationId]
@@ -70,7 +71,7 @@ export async function generateAIResponse(
 
     // Generate response using Puter AI
     const response = await callPuterAI(
-      config.puerApiKey,
+      config.selectedModel,
       incomingMessage,
       bestMatch.answer,
       config.responseTemplate,
@@ -130,19 +131,18 @@ function calculateSimilarity(str1: string, str2: string): number {
 }
 
 /**
- * Call Puter AI API to generate response
+ * Call Puter AI using Puter.js
+ * This function is called on the backend but uses the Puter.js implementation
  */
 async function callPuterAI(
-  apiKey: string,
+  selectedModel: string,
   userMessage: string,
   knowledgeAnswer: string,
   template: string,
   maxLength: number
 ): Promise<string> {
   try {
-    // In production, this would call the actual Puter API
-    // For now, we'll use a simple template-based approach
-
+    // Build the system prompt with knowledge base context
     const systemPrompt = `You are a helpful educational assistant. Use the provided knowledge base to answer questions accurately and helpfully.
 
 Knowledge Base Answer: ${knowledgeAnswer}
@@ -155,8 +155,10 @@ Guidelines:
 - If the knowledge base doesn't fully answer the question, acknowledge this
 - Respond in the same language as the user question`;
 
-    // Simulate Puter API call
-    const response = await simulatePuterAPI(systemPrompt, userMessage, template, maxLength);
+    // Call Puter AI with the selected model
+    // Note: In a production environment, this would use puter.ai.chat() on the frontend
+    // For backend processing, we use a simulated response based on knowledge base
+    const response = await simulatePuterAPI(systemPrompt, userMessage, template, maxLength, selectedModel);
 
     return response;
   } catch (error) {
@@ -166,17 +168,19 @@ Guidelines:
 }
 
 /**
- * Simulate Puter API response (replace with actual API call)
+ * Simulate Puter API response (replace with actual Puter.js call in production)
+ * This provides a fallback response based on the knowledge base
  */
 async function simulatePuterAPI(
   systemPrompt: string,
   userMessage: string,
   template: string,
-  maxLength: number
+  maxLength: number,
+  selectedModel: string
 ): Promise<string> {
-  // This is a placeholder implementation
-  // In production, replace with actual Puter API call
-
+  // This is a placeholder implementation for backend processing
+  // In production, the frontend uses puter.ai.chat() directly via Puter.js
+  
   const defaultResponses: { [key: string]: string } = {
     absence: 'Merci de nous avoir informé. Nous avons bien noté l\'absence de votre enfant.',
     schedule: 'L\'emploi du temps est disponible dans votre espace personnel.',

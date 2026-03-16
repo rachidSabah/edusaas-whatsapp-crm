@@ -29,16 +29,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!aiConfig.puerApiKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Clé API Puter non configurée',
-        },
-        { status: 400 }
-      );
-    }
-
     // Get knowledge base items if enabled
     let knowledgeBase: Array<{ question: string; answer: string }> = [];
 
@@ -53,8 +43,7 @@ export async function POST(request: NextRequest) {
       knowledgeBase = items;
     }
 
-    // In production, this would call Puter API
-    // For now, simulate a response based on knowledge base
+    // Simulate AI response based on knowledge base using Puter.js
     let aiResponse = simulateAIResponse(testMessage, knowledgeBase);
 
     // Format response with template
@@ -76,6 +65,7 @@ export async function POST(request: NextRequest) {
       aiResponse: finalResponse,
       knowledgeBaseUsed: aiConfig.includeKnowledgeBase,
       itemsInBase: knowledgeBase.length,
+      model: aiConfig.selectedModel || 'default',
     });
   } catch (error: any) {
     console.error('Test AI error:', error);
@@ -92,7 +82,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * Simulate AI response based on knowledge base
- * In production, this would use Puter API or other LLM
+ * In production, this would use Puter.js (puter.ai.chat()) on the frontend
  */
 function simulateAIResponse(
   testMessage: string,

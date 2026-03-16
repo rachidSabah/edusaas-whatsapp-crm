@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const aiConfigs = await db.query<{
       id: string;
       isEnabled: number;
-      puerApiKey: string;
+      selectedModel: string;
       responseTemplate: string;
       maxResponseLength: number;
       includeKnowledgeBase: number;
@@ -107,13 +107,13 @@ export async function POST(request: NextRequest) {
       // Update
       await db.execute(
         `UPDATE ai_automation_config 
-         SET isEnabled = ?, puerApiKey = ?, responseTemplate = ?, 
+         SET isEnabled = ?, selectedModel = ?, responseTemplate = ?, 
              maxResponseLength = ?, includeKnowledgeBase = ?, 
              autoRespondToAll = ?, responseDelay = ?
          WHERE organizationId = ?`,
         [
           aiConfig.isEnabled ? 1 : 0,
-          aiConfig.puerApiKey,
+          aiConfig.selectedModel || 'default',
           aiConfig.responseTemplate,
           aiConfig.maxResponseLength,
           aiConfig.includeKnowledgeBase ? 1 : 0,
@@ -126,14 +126,14 @@ export async function POST(request: NextRequest) {
       // Insert
       await db.execute(
         `INSERT INTO ai_automation_config 
-         (id, organizationId, isEnabled, puerApiKey, responseTemplate, 
+         (id, organizationId, isEnabled, selectedModel, responseTemplate, 
           maxResponseLength, includeKnowledgeBase, autoRespondToAll, responseDelay)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.organizationId,
           aiConfig.isEnabled ? 1 : 0,
-          aiConfig.puerApiKey,
+          aiConfig.selectedModel || 'default',
           aiConfig.responseTemplate,
           aiConfig.maxResponseLength,
           aiConfig.includeKnowledgeBase ? 1 : 0,

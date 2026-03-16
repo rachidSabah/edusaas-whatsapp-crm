@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 interface AIConfig {
   id: string;
   isEnabled: boolean;
-  puerApiKey: string;
+  selectedModel?: string;
   responseTemplate: string;
   maxResponseLength: number;
   includeKnowledgeBase: boolean;
@@ -56,7 +56,7 @@ export default function AIAutomationPage() {
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     id: '',
     isEnabled: true,
-    puerApiKey: '',
+    selectedModel: 'default',
     responseTemplate: 'Basé sur notre base de connaissance: {answer}',
     maxResponseLength: 500,
     includeKnowledgeBase: true,
@@ -209,23 +209,27 @@ export default function AIAutomationPage() {
             </Button>
           </div>
 
-          {/* Puter API Key */}
+          {/* Puter Model Selection */}
           <div className="space-y-2">
-            <Label htmlFor="puerApiKey">Clé API Puter</Label>
-            <Input
-              id="puerApiKey"
-              type="password"
-              value={aiConfig.puerApiKey}
-              onChange={(e) =>
-                setAiConfig({ ...aiConfig, puerApiKey: e.target.value })
+            <Label htmlFor="selectedModel">Modèle Puter</Label>
+            <Select
+              value={aiConfig.selectedModel || 'default'}
+              onValueChange={(value) =>
+                setAiConfig({ ...aiConfig, selectedModel: value })
               }
-              placeholder="Entrez votre clé API Puter"
-            />
+            >
+              <SelectTrigger id="selectedModel">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Modèle par défaut</SelectItem>
+                <SelectItem value="gpt-4">GPT-4</SelectItem>
+                <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                <SelectItem value="claude-3">Claude 3</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-slate-500">
-              Obtenez votre clé sur{' '}
-              <a href="https://puter.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                puter.com
-              </a>
+              Sélectionnez le modèle IA à utiliser pour les réponses
             </p>
           </div>
 
@@ -331,7 +335,7 @@ export default function AIAutomationPage() {
             <Button
               variant="outline"
               onClick={handleTestAI}
-              disabled={testing || !aiConfig.puerApiKey}
+              disabled={testing}
               className="flex-1"
             >
               {testing ? (
