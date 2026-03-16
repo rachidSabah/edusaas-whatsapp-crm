@@ -103,6 +103,24 @@ const AI_CONFIG_TABLE_MIGRATION = [
   ` },
 ];
 
+const STUDENT_LOGS_TABLE_MIGRATION = [
+  { name: 'student_logs', sql: `
+    CREATE TABLE IF NOT EXISTS student_logs (
+      id TEXT PRIMARY KEY,
+      studentId TEXT NOT NULL,
+      organizationId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      description TEXT NOT NULL,
+      severity TEXT DEFAULT 'normal',
+      createdBy TEXT,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  ` },
+];
+
 // System templates to seed
 const SYSTEM_TEMPLATES = [
   {
@@ -268,6 +286,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Check student_logs table
+    for (const table of STUDENT_LOGS_TABLE_MIGRATION) {
+      try {
+        await tursoQuery(dbUrl, dbToken, `SELECT id FROM ${table.name} LIMIT 1`);
+        tablesStatus.push({ name: table.name, exists: true });
+      } catch {
+        tablesStatus.push({ name: table.name, exists: false });
+      }
+    }
+
     return NextResponse.json({
       parentColumns: parentColumnsStatus,
       organizationsColumns: orgColumnsStatus,
@@ -353,6 +381,20 @@ export async function POST(request: NextRequest) {
 
     // Run ai_config table migration
     for (const migration of AI_CONFIG_TABLE_MIGRATION) {
+      try {
+        await tursoExecute(dbUrl, dbToken, migration.sql);
+        results.push({ type: 'table', name: migration.name, status: 'created' });
+      } catch (error: any) {
+        if (error.message?.includes('already exists') || error.message?.includes('table')) {
+          results.push({ type: 'table', name: migration.name, status: 'exists' });
+        } else {
+          results.push({ type: 'table', name: migration.name, status: 'error', error: error.message });
+        }
+      }
+    }
+
+    // Run student_logs table migration
+    for (const migration of STUDENT_LOGS_TABLE_MIGRATION) {
       try {
         await tursoExecute(dbUrl, dbToken, migration.sql);
         results.push({ type: 'table', name: migration.name, status: 'created' });

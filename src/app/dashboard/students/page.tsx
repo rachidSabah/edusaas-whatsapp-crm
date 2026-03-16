@@ -33,8 +33,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   GraduationCap, Plus, Search, Edit, AlertCircle, 
-  Download, Upload, FileSpreadsheet, Loader2, MessageSquare
+  Download, Upload, FileSpreadsheet, Loader2, MessageSquare, BookOpen, Eye
 } from 'lucide-react';
+import { LogbookModal } from '@/components/LogbookModal';
+import { useRouter } from 'next/navigation';
 
 interface Student {
   id: string;
@@ -75,6 +77,9 @@ export default function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logbookOpen, setLogbookOpen] = useState(false);
+  const [selectedStudentForLog, setSelectedStudentForLog] = useState<Student | null>(null);
+  const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -197,6 +202,19 @@ export default function StudentsPage() {
       parent2Whatsapp: student.parent2Whatsapp === 1,
     });
     setDialogOpen(true);
+  };
+
+  const handleDoubleClick = (student: Student) => {
+    router.push(`/dashboard/student-profile?id=${student.id}`);
+  };
+
+  const handleOpenLogbook = (student: Student) => {
+    setSelectedStudentForLog(student);
+    setLogbookOpen(true);
+  };
+
+  const handleViewProfile = (student: Student) => {
+    router.push(`/dashboard/student-profile?id=${student.id}`);
   };
 
   // Export students to CSV
@@ -658,7 +676,7 @@ export default function StudentsPage() {
                 </TableRow>
               ) : (
                 students.map((student) => (
-                  <TableRow key={student.id}>
+                  <TableRow key={student.id} onDoubleClick={() => handleDoubleClick(student)} className="cursor-pointer hover:bg-slate-50">
                     <TableCell className="font-medium">
                       <div>
                         <p>{student.fullName}</p>
@@ -709,13 +727,31 @@ export default function StudentsPage() {
                     <TableCell>{student.program || '-'}</TableCell>
                     <TableCell>{getStatusBadge(student.status)}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(student)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Voir le profil (double-clic)"
+                          onClick={() => handleViewProfile(student)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Livret de bord"
+                          onClick={() => handleOpenLogbook(student)}
+                        >
+                          <BookOpen className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(student)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -724,6 +760,20 @@ export default function StudentsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Logbook Modal */}
+      {selectedStudentForLog && (
+        <LogbookModal
+          open={logbookOpen}
+          onOpenChange={setLogbookOpen}
+          studentId={selectedStudentForLog.id}
+          studentName={`${selectedStudentForLog.firstName} ${selectedStudentForLog.lastName}`}
+          onSuccess={() => {
+            // Refresh students list if needed
+            fetchStudents();
+          }}
+        />
+      )}
 
       {/* Import Help */}
       <Card className="border-0 shadow-md bg-slate-50">
