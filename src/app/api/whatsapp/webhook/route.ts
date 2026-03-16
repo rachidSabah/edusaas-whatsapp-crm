@@ -1,33 +1,54 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { processIncomingMessage } from '@/lib/whatsapp';
 import { getDbContext } from '@/lib/db-context';
 
 // REQUIRED FOR CLOUDFLARE PAGES: This tells Next.js to use the Edge runtime instead of Node.js
-export const runtime = 'edge'; 
-
-// You will put this same exact string into the Meta Dashboard later
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'my_super_secret_verify_token_123';
+export const runtime = 'edge';
 
 // 1. GET Request: Meta uses this to verify your webhook URL is working
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
 
-  const mode = searchParams.get('hub.mode');
-  const token = searchParams.get('hub.verify_token');
-  const challenge = searchParams.get('hub.challenge');
+    const mode = searchParams.get('hub.mode');
+    const token = searchParams.get('hub.verify_token');
+    const challenge = searchParams.get('hub.challenge');
 
-  // Check if a request is from Meta and the token matches
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('WEBHOOK_VERIFIED successfully!');
+    if (!mode || !token || !challenge) {
+      console.warn('Missing required webhook verification parameters');
+      return new NextResponse('Forbidden: Missing parameters', { status: 403 });
+    }
+
+    if (mode !== 'subscribe') {
+      return new NextResponse('Forbidden: Invalid mode', { status: 403 });
+    }
+
+    // Get all webhook configurations to find matching token
+    const db = getDbContext();
+    const configs = await db.query<{
+      organizationId: string;
+      verifyToken: string;
+    }>(
+      `SELECT organizationId, verifyToken FROM webhook_config WHERE verifyToken = ?`,
+      [token]
+    );
+
+    if (configs.length === 0) {
+      console.warn('Invalid verify token received:', token);
+      return new NextResponse('Forbidden: Invalid Token', { status: 403 });
+    }
+
+    console.log('WEBHOOK_VERIFIED successfully for organization:', configs[0].organizationId);
     // Meta requires us to return the challenge string as plain text
     return new NextResponse(challenge, { status: 200 });
-  } else {
-    return new NextResponse('Forbidden: Invalid Token', { status: 403 });
+  } catch (error) {
+    console.error('Webhook verification error:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
 // 2. POST Request: Meta sends the actual WhatsApp messages here
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
