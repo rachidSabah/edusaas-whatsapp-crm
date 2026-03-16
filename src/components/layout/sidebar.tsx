@@ -45,6 +45,10 @@ import {
   Send,
   Mail,
   ClipboardCheck,
+  Brain,
+  Bell,
+  Webhook,
+  Phone,
 } from 'lucide-react';
 
 const menuItems = [
@@ -64,6 +68,11 @@ const menuItems = [
   { href: '/dashboard/messaging', label: 'Envoi Messages', icon: Send },
   { href: '/dashboard/knowledge-base', label: 'Base de connaissances', icon: BookOpen },
   { href: '/dashboard/whatsapp', label: 'WhatsApp', icon: Smartphone },
+  { href: '/dashboard/whatsapp/multi-numbers', label: 'Multi-Numéros', icon: Phone },
+  { href: '/dashboard/whatsapp/meta-business', label: 'Envoyer via Meta', icon: Send },
+  { href: '/dashboard/whatsapp/knowledge-base', label: 'Base de Connaissance', icon: BookOpen },
+  { href: '/dashboard/whatsapp/ai-automation', label: 'IA & Automatisation', icon: Brain },
+  { href: '/dashboard/whatsapp/webhook-config', label: 'Config Webhook', icon: Webhook },
   { href: '/dashboard/ai-settings', label: 'Configuration IA', icon: Bot },
   { href: '/dashboard/reports', label: 'Rapports', icon: FileBarChart },
   { href: '/dashboard/backup', label: 'Sauvegarde', icon: HardDrive },
@@ -149,12 +158,14 @@ export function Sidebar({ user }: SidebarProps) {
           {menuItems.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            const isWhatsAppSub = item.href.includes('/dashboard/whatsapp/') && item.href !== '/dashboard/whatsapp';
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+                    isWhatsAppSub && 'pl-8 text-sm',
                     isActive
                       ? 'bg-green-600 text-white'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
