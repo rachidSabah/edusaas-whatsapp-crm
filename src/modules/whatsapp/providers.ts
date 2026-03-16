@@ -1,5 +1,6 @@
 // WhatsApp Service Providers
 import type { WhatsAppConfig, WhatsAppMessage, WhatsAppSendResult, WhatsAppWebhookPayload } from './types';
+import { MetaWhatsAppProvider, createMetaProvider, type MetaConfig } from './meta-provider';
 
 /**
  * Evolution API Provider
@@ -184,11 +185,19 @@ export class CustomWebhookProvider {
 /**
  * Get the appropriate WhatsApp provider
  */
-export function getWhatsAppProvider(config: WhatsAppConfig): EvolutionAPIProvider | CustomWebhookProvider {
+export function getWhatsAppProvider(config: WhatsAppConfig): EvolutionAPIProvider | CustomWebhookProvider | MetaWhatsAppProvider {
   switch (config.provider) {
     case 'evolution':
       return new EvolutionAPIProvider(config);
-    case 'business_api':
+    case 'business-api':
+      // For Meta Business API, create Meta provider
+      const metaConfig: MetaConfig = {
+        businessAccountId: config.instanceId || '',
+        phoneNumberId: config.apiUrl.split('/').pop() || '',
+        accessToken: config.apiKey,
+        webhookVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'verify_token',
+      };
+      return createMetaProvider(metaConfig);
     case 'custom':
     default:
       return new CustomWebhookProvider(config);
@@ -217,6 +226,9 @@ export function parseWhatsAppWebhook(
   const provider = getWhatsAppProvider(config);
   if (provider instanceof EvolutionAPIProvider) {
     return provider.parseWebhook(payload);
+  }
+  if (provider instanceof MetaWhatsAppProvider) {
+    return provider.parseWebhook(payload as any);
   }
   return (provider as CustomWebhookProvider).parseWebhook(payload);
 }

@@ -29,17 +29,49 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    // Log the entire webhook for debugging
+    console.log('📨 Webhook received:', JSON.stringify(body, null, 2));
+
     // Verify this is a WhatsApp API event
     if (body.object === 'whatsapp_business_account') {
       for (const entry of body.entry) {
         for (const change of entry.changes) {
-          const message = change.value.messages?.[0];
-          const contact = change.value.contacts?.[0];
+          const value = change.value;
+          const phoneNumberId = value.metadata?.phone_number_id;
+          const displayPhoneNumber = value.metadata?.display_phone_number;
 
-          if (message) {
-            console.log('🔔 New WhatsApp Message Received!');
-            console.log('From Phone Number:', contact?.wa_id);
-            console.log('Message Content:', message.text?.body);
+          // Handle incoming messages
+          if (value.messages && value.messages.length > 0) {
+            for (const message of value.messages) {
+              console.log('🔔 New WhatsApp Message Received!');
+              console.log('From:', message.from);
+              console.log('Message ID:', message.id);
+              console.log('Type:', message.type);
+              
+              if (message.text?.body) {
+                console.log('Content:', message.text.body);
+              }
+              
+              // TODO: Forward to your backend API for processing
+              // Example:
+              // await fetch('https://your-api.com/api/whatsapp/webhook', {
+              //   method: 'POST',
+              //   headers: { 'Content-Type': 'application/json' },
+              //   body: JSON.stringify({ message, phoneNumberId, displayPhoneNumber })
+              // });
+            }
+          }
+
+          // Handle message status updates (delivered, read, etc.)
+          if (value.statuses && value.statuses.length > 0) {
+            for (const status of value.statuses) {
+              console.log('📊 Message Status Update:');
+              console.log('Message ID:', status.id);
+              console.log('Status:', status.status);
+              console.log('Timestamp:', status.timestamp);
+              
+              // TODO: Update message status in your database
+            }
           }
         }
       }
@@ -47,6 +79,7 @@ export async function POST(request: Request) {
       // We must always return a 200 OK so Meta knows we received the message
       return new NextResponse('EVENT_RECEIVED', { status: 200 });
     } else {
+      console.warn('Received non-WhatsApp event:', body.object);
       return new NextResponse('Not a WhatsApp event', { status: 404 });
     }
   } catch (error) {
