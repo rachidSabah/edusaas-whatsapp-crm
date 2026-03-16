@@ -123,7 +123,7 @@ export default function AssignmentsPage() {
     description: '',
     assignedToId: '',
     dueDate: '',
-    startDate: '',
+    startDate: typeof window !== 'undefined' ? new Date().toISOString().split('T')[0] : '',
     priority: 'MEDIUM',
     attachmentNames: [] as string[],
   });
@@ -349,9 +349,9 @@ export default function AssignmentsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Non assigné</SelectItem>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name}
+                      {Array.isArray(users) && users.map((u) => (
+                        <SelectItem key={u.id} value={u.id || ''}>
+                          {u.name || u.email || 'Utilisateur sans nom'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -369,7 +369,7 @@ export default function AssignmentsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                        <SelectItem key={key} value={key || ''}>{label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -536,7 +536,7 @@ export default function AssignmentsPage() {
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                  <SelectItem key={key} value={key || ''}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -547,7 +547,7 @@ export default function AssignmentsPage() {
               <SelectContent>
                 <SelectItem value="all">Toutes les priorités</SelectItem>
                 {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                  <SelectItem key={key} value={key || ''}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

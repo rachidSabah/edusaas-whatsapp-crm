@@ -31,6 +31,7 @@ import {
   Calendar,
   User,
   Loader2,
+  Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -175,6 +176,13 @@ export default function TasksPage() {
             className={viewMode === 'all' ? 'bg-green-600' : ''}
           >
             Toutes
+          </Button>
+          <Button 
+            onClick={() => window.location.href = '/dashboard/assignments'}
+            className="bg-gradient-to-r from-green-500 to-emerald-600"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Créer tâche
           </Button>
         </div>
       </div>
