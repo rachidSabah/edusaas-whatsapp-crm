@@ -42,10 +42,13 @@ import {
   UserCheck,
   UserX,
   GraduationCap,
+  AlertCircle,
+  CheckCircle,
 } from 'lucide-react';
 import { USER_ROLES, ROLE_LABELS, USER_STATUS, USER_STATUS_LABELS } from '@/lib/constants';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface User {
   id: string;
@@ -78,6 +81,7 @@ export default function AdminDashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<User | Teacher | null>(null);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -91,18 +95,30 @@ export default function AdminDashboardPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setMessage(null);
     try {
       if (activeTab === 'users') {
         const response = await fetch('/api/admin/users');
         const data = await response.json();
-        setUsers(data.users || []);
+        if (!response.ok) {
+          setMessage({ type: 'error', text: data.error || 'Erreur lors du chargement des utilisateurs' });
+          setUsers([]);
+        } else {
+          setUsers(data.users || []);
+        }
       } else {
         const response = await fetch('/api/teachers');
         const data = await response.json();
-        setTeachers(data.teachers || []);
+        if (!response.ok) {
+          setMessage({ type: 'error', text: data.error || 'Erreur lors du chargement des enseignants' });
+          setTeachers([]);
+        } else {
+          setTeachers(data.teachers || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
     } finally {
       setLoading(false);
     }
@@ -115,11 +131,9 @@ export default function AdminDashboardPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setMessage(null);
     try {
-      const url = editingItem
-        ? `/${activeTab === 'users' ? 'api/admin/users' : 'api/teachers'}`
-        : `/${activeTab === 'users' ? 'api/admin/users' : 'api/teachers'}`;
-      
+      const url = activeTab === 'users' ? '/api/admin/users' : '/api/teachers';
       const method = editingItem ? 'PUT' : 'POST';
       
       const body = activeTab === 'users' 
@@ -143,6 +157,8 @@ export default function AdminDashboardPage() {
         body: JSON.stringify(body),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         setDialogOpen(false);
         setEditingItem(null);
@@ -155,13 +171,14 @@ export default function AdminDashboardPage() {
           subject: '',
           status: 'ACTIVE',
         });
-        fetchData();
+        setMessage({ type: 'success', text: editingItem ? 'Modifié avec succès' : 'Créé avec succès' });
+        await fetchData();
       } else {
-        const data = await response.json();
-        alert(data.error || 'Erreur');
+        setMessage({ type: 'error', text: data.error || 'Erreur lors de la sauvegarde' });
       }
     } catch (error) {
       console.error('Save error:', error);
+      setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
     } finally {
       setSaving(false);
     }
@@ -249,6 +266,15 @@ export default function AdminDashboardPage() {
           <p className="text-slate-600">Gérez les utilisateurs et les enseignants</p>
         </div>
       </div>
+
+      {/* Message Alert */}
+      {message && (
+        <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={message.type === 'success' ? 'border-green-500 bg-green-50' : ''}>
+          {message.type === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4" />}
+          <AlertTitle>{message.type === 'success' ? 'Succès' : 'Erreur'}</AlertTitle>
+          <AlertDescription>{message.text}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200">

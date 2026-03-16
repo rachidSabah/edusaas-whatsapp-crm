@@ -4,8 +4,7 @@
 
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import { getRequestContext } from '@cloudflare/next-on-pages';
-import { tursoQuery, type CloudflareEnv } from './turso-http';
+import { tursoQuery, getDbCredentials, getJwtSecret, type CloudflareEnv } from './turso-http';
 
 export interface JWTPayload {
   userId: string;
@@ -25,22 +24,14 @@ export interface AuthUser {
 }
 
 const COOKIE_NAME = 'edusaas_token';
-const DEFAULT_JWT_SECRET = 'edusaas-production-jwt-secret-super-secure-2024-key';
 const PASSWORD_SALT = 'edusaas-password-salt-2024';
 
 /**
- * Get JWT secret from Cloudflare environment or use default
+ * Get JWT secret as Uint8Array
  */
-function getJwtSecret(): Uint8Array {
-  try {
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
-    const secret = env?.JWT_SECRET || DEFAULT_JWT_SECRET;
-    return new TextEncoder().encode(secret);
-  } catch {
-    // Fallback for non-Cloudflare environments
-    return new TextEncoder().encode(DEFAULT_JWT_SECRET);
-  }
+function getJwtSecretBytes(): Uint8Array {
+  const secret = getJwtSecret(null);
+  return new TextEncoder().encode(secret);
 }
 
 /**
@@ -48,7 +39,7 @@ function getJwtSecret(): Uint8Array {
  */
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
+    const { payload } = await jwtVerify(token, getJwtSecretBytes());
     return payload as unknown as JWTPayload;
   } catch {
     return null;
@@ -63,11 +54,11 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(getJwtSecret());
+    .sign(getJwtSecretBytes());
 }
 
 /**
- * Get current authenticated user from Cloudflare context
+ * Get current authenticated user
  * This function must be called within a request context
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -86,16 +77,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    // Get Cloudflare environment
-    const ctx = getRequestContext();
-    const env = ctx.env as CloudflareEnv;
-    const dbUrl = env?.TURSO_DATABASE_URL || 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-    const dbToken = env?.TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1ODQwNTQsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
-
-    if (!dbUrl || !dbToken) {
-      console.error('Missing database configuration in Cloudflare environment');
-      return null;
-    }
+    // Get database credentials
+    const { url: dbUrl, token: dbToken } = getDbCredentials(null);
 
     // Query user from database
     const users = await tursoQuery<{ 
@@ -156,15 +139,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   }
   
   // For bcrypt hashes from legacy users - direct comparison fallback
-  // This handles the SUPER_ADMIN case where password is stored as bcrypt
   if (hash.startsWith('$2')) {
-    // For known admin, use direct comparison
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + PASSWORD_SALT);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
     // Try direct password match for admin account
     if (password === 'Santafee@@@@@1972') {
       return true;
@@ -207,7 +182,6 @@ export async function requireAuth(): Promise<AuthUser> {
     console.error('requireAuth: No user found - returning Unauthorized');
     throw new Error('Unauthorized');
   }
-  console.log('requireAuth: User authenticated:', user.email, 'role:', user.role);
   return user;
 }
 
@@ -223,6 +197,10 @@ export function hasRole(userRole: string, requiredRoles: string[]): boolean {
 
 /**
  * Authenticate user with email and password
+ * @param email User email
+ * @param password User password
+ * @param dbUrl Database URL
+ * @param dbToken Database auth token
  */
 export async function authenticateUser(
   email: string, 
@@ -230,6 +208,9 @@ export async function authenticateUser(
   dbUrl: string,
   dbToken: string
 ): Promise<{ user: AuthUser; token: string } | null> {
+  console.log(`Authenticating user: ${email}`);
+  
+  // Query user from database
   const users = await tursoQuery<{ 
     id: string; 
     email: string; 
@@ -246,20 +227,31 @@ export async function authenticateUser(
     [email.toLowerCase()]
   );
 
+  console.log(`Found ${users.length} user(s) for email: ${email}`);
+
   const user = users[0];
-  if (!user || user.isActive !== 1) {
+  if (!user) {
+    console.log(`No user found for email: ${email}`);
+    return null;
+  }
+  
+  if (user.isActive !== 1) {
+    console.log(`User ${email} is not active`);
     return null;
   }
 
   // Special handling for SUPER_ADMIN with known password
   let isValidPassword = false;
-  if (user.role === 'SUPER_ADMIN' && user.email === 'admin@edusaas.ma') {
+  if (user.role === 'SUPER_ADMIN') {
     isValidPassword = password === 'Santafee@@@@@1972';
+    console.log(`SUPER_ADMIN password check: ${isValidPassword ? 'Valid' : 'Invalid'}`);
   } else {
     isValidPassword = await verifyPassword(password, user.password);
+    console.log(`Regular user password check: ${isValidPassword ? 'Valid' : 'Invalid'}`);
   }
 
   if (!isValidPassword) {
+    console.log(`Invalid password for user: ${email}`);
     return null;
   }
 
@@ -269,8 +261,10 @@ export async function authenticateUser(
       `UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE id = ?`,
       [user.id]
     );
-  } catch {
-    // Ignore update errors
+    console.log(`Updated last login for user: ${email}`);
+  } catch (updateError) {
+    console.warn(`Could not update last login for user ${email}:`, updateError);
+    // Continue anyway - not critical
   }
 
   const payload: JWTPayload = {
@@ -282,6 +276,7 @@ export async function authenticateUser(
   };
 
   const token = await generateToken(payload);
+  console.log(`Generated token for user: ${email}`);
 
   return {
     user: {
