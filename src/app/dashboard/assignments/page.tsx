@@ -128,6 +128,19 @@ export default function AssignmentsPage() {
     attachmentNames: [] as string[],
   });
 
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      assignedToId: '',
+      dueDate: '',
+      startDate: new Date().toISOString().split('T')[0],
+      priority: 'MEDIUM',
+      attachmentNames: [],
+    });
+    setEditingTask(null);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setMessage(null);
@@ -137,15 +150,15 @@ export default function AssignmentsPage() {
         fetch('/api/admin/users')
       ]);
 
-      const tasksData = await tasksRes.json() as { tasks: Task[]; error?: string };
-      const usersData = await usersRes.json() as { users: User[]; error?: string };
-
-      if (!tasksRes.ok) {
-        setMessage({ type: 'error', text: tasksData.error || 'Erreur lors du chargement des tâches' });
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json() as { tasks: Task[] };
+        setTasks(tasksData.tasks || []);
       }
 
-      setTasks(tasksData.tasks || []);
-      setUsers(usersData.users || []);
+      if (usersRes.ok) {
+        const usersData = await usersRes.json() as { users: User[] };
+        setUsers(usersData.users || []);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       setMessage({ type: 'error', text: 'Erreur de connexion au serveur' });
@@ -160,20 +173,32 @@ export default function AssignmentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.title.trim()) {
+      setMessage({ type: 'error', text: 'Le titre est requis' });
+      return;
+    }
+
+    if (!formData.dueDate) {
+      setMessage({ type: 'error', text: 'La date d\'échéance est requise' });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
+    
     try {
       const method = editingTask ? 'PUT' : 'POST';
 
       const body = {
         ...(editingTask ? { id: editingTask.id } : {}),
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         assignedToId: formData.assignedToId || null,
         dueDate: formData.dueDate,
         startDate: formData.startDate || new Date().toISOString().split('T')[0],
         priority: formData.priority,
-        attachments: formData.attachmentNames.length > 0 ? formData.attachmentNames : null,
+        attachments: formData.attachmentNames.length > 0 ? formData.attachmentNames.join(',') : null,
       };
 
       const response = await fetch('/api/tasks', {
@@ -182,22 +207,13 @@ export default function AssignmentsPage() {
         body: JSON.stringify(body),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { success?: boolean; error?: string };
 
       if (response.ok) {
         setDialogOpen(false);
-        setEditingTask(null);
-        setFormData({
-          title: '',
-          description: '',
-          assignedToId: '',
-          dueDate: '',
-          startDate: '',
-          priority: 'MEDIUM',
-          attachmentNames: [],
-        });
+        resetForm();
         setMessage({ type: 'success', text: editingTask ? 'Tâche modifiée avec succès' : 'Tâche créée avec succès' });
-        await fetchData();
+        setTimeout(() => fetchData(), 500);
       } else {
         setMessage({ type: 'error', text: data.error || 'Erreur lors de la sauvegarde' });
       }
@@ -215,10 +231,12 @@ export default function AssignmentsPage() {
     try {
       const response = await fetch(`/api/tasks?id=${id}`, { method: 'DELETE' });
       if (response.ok) {
+        setMessage({ type: 'success', text: 'Tâche supprimée avec succès' });
         fetchData();
       }
     } catch (error) {
       console.error('Delete error:', error);
+      setMessage({ type: 'error', text: 'Erreur lors de la suppression' });
     }
   };
 
@@ -231,7 +249,7 @@ export default function AssignmentsPage() {
       dueDate: task.dueDate,
       startDate: task.startDate,
       priority: task.priority,
-      attachmentNames: [],
+      attachmentNames: task.attachments ? task.attachments.split(',') : [],
     });
     setDialogOpen(true);
   };
@@ -244,7 +262,7 @@ export default function AssignmentsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const fileNames = files.map(f => f.name);
-    setFormData({ ...formData, attachmentNames: fileNames });
+    setFormData(prev => ({ ...prev, attachmentNames: fileNames }));
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -275,22 +293,13 @@ export default function AssignmentsPage() {
           <h1 className="text-3xl font-bold text-slate-900">Gestion des Tâches</h1>
           <p className="text-slate-600">Créez et suivez les tâches assignées aux utilisateurs</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button 
               className="bg-gradient-to-r from-green-500 to-emerald-600"
-              onClick={() => {
-                setEditingTask(null);
-                setFormData({
-                  title: '',
-                  description: '',
-                  assignedToId: '',
-                  dueDate: '',
-                  startDate: new Date().toISOString().split('T')[0],
-                  priority: 'MEDIUM',
-                  attachmentNames: [],
-                });
-              }}
             >
               <Plus className="w-4 h-4 mr-2" />
               Nouvelle tâche
@@ -305,117 +314,116 @@ export default function AssignmentsPage() {
                 Assignez une tâche à un membre de l&apos;équipe
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Titre *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Titre de la tâche"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Description détaillée..."
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Titre *</Label>
+                  <Label htmlFor="assignedToId">Assigner à</Label>
+                  <Select
+                    value={formData.assignedToId}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, assignedToId: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Non assigné</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priorité</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, priority: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Date de début</Label>
                   <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Titre de la tâche"
+                    id="startDate"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Date d&apos;échéance *</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
                     required
                   />
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Description détaillée..."
-                    rows={4}
+              <div className="space-y-2">
+                <Label>Pièces jointes</Label>
+                <div className="border-2 border-dashed border-slate-200 rounded-lg p-4">
+                  <Input
+                    type="file"
+                    multiple
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="assignedToId">Assigner à</Label>
-                    <Select
-                      value={formData.assignedToId}
-                      onValueChange={(v) => setFormData({ ...formData, assignedToId: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Non assigné</SelectItem>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="priority">Priorité</Label>
-                    <Select
-                      value={formData.priority}
-                      onValueChange={(v) => setFormData({ ...formData, priority: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="startDate">Date de début</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">Date d&apos;échéance *</Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Pièces jointes</Label>
-                  <div className="border-2 border-dashed border-slate-200 rounded-lg p-4">
-                    <Input
-                      type="file"
-                      multiple
-                      onChange={handleFileChange}
-                      className="cursor-pointer"
-                    />
-                    <p className="text-xs text-slate-500 mt-2">
-                      PDF, DOC, DOCX, XLS, XLSX, images acceptés
-                    </p>
-                    {formData.attachmentNames.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {formData.attachmentNames.map((fileName, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                            <FileText className="w-4 h-4" />
-                            {fileName}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    PDF, DOC, DOCX, XLS, XLSX, images acceptés
+                  </p>
+                  {formData.attachmentNames.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {formData.attachmentNames.map((fileName, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
+                          <FileText className="w-4 h-4" />
+                          {fileName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
+
               <DialogFooter>
                 <Button type="submit" disabled={saving} className="bg-green-600">
                   {saving ? (
@@ -514,19 +522,16 @@ export default function AssignmentsPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  placeholder="Rechercher une tâche..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                placeholder="Rechercher une tâche..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="bg-slate-50"
+              />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Statut" />
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
@@ -536,8 +541,8 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Priorité" />
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les priorités</SelectItem>
@@ -553,18 +558,16 @@ export default function AssignmentsPage() {
       {/* Tasks Table */}
       <Card className="border-0 shadow-md">
         <CardHeader>
-          <CardTitle>Liste des tâches</CardTitle>
+          <CardTitle>Tâches ({filteredTasks.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
-              <p className="text-slate-500 mt-2">Chargement...</p>
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-8">
-              <ClipboardList className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-500">Aucune tâche trouvée</p>
+            <div className="text-center py-8 text-slate-500">
+              Aucune tâche trouvée
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -576,7 +579,7 @@ export default function AssignmentsPage() {
                     <TableHead>Priorité</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Échéance</TableHead>
-                    <TableHead>Progression</TableHead>
+                    <TableHead>Progrès</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -586,52 +589,48 @@ export default function AssignmentsPage() {
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell>{task.assignedToName || '-'}</TableCell>
                       <TableCell>
-                        <Badge className={PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.MEDIUM}>
+                        <Badge className={PRIORITY_COLORS[task.priority] || ''}>
                           {PRIORITY_LABELS[task.priority]}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={STATUS_COLORS[task.status] || STATUS_COLORS.PENDING}>
+                        <Badge className={STATUS_COLORS[task.status] || ''}>
                           {STATUS_LABELS[task.status]}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-400" />
-                          <span className={isOverdue(task.dueDate, task.status) ? 'text-red-600 font-semibold' : ''}>
-                            {format(new Date(task.dueDate), 'dd MMM', { locale: fr })}
-                          </span>
-                        </div>
+                        {format(new Date(task.dueDate), 'dd MMM yyyy', { locale: fr })}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={task.progress} className="w-16 h-2" />
-                          <span className="text-sm text-slate-600">{task.progress}%</span>
+                        <div className="w-full bg-slate-200 rounded-full h-2">
+                          <div
+                            className="bg-green-500 h-2 rounded-full"
+                            style={{ width: `${task.progress}%` }}
+                          />
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button
+                            size="sm"
                             variant="ghost"
-                            size="icon"
                             onClick={() => handleView(task)}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="sm"
                             variant="ghost"
-                            size="icon"
                             onClick={() => handleEdit(task)}
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
+                            size="sm"
                             variant="ghost"
-                            size="icon"
-                            className="text-red-500"
                             onClick={() => handleDelete(task.id)}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </div>
                       </TableCell>
@@ -645,48 +644,45 @@ export default function AssignmentsPage() {
       </Card>
 
       {/* View Dialog */}
-      {viewingTask && (
-        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{viewingTask.title}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{viewingTask?.title}</DialogTitle>
+          </DialogHeader>
+          {viewingTask && (
+            <div className="space-y-4">
               <div>
-                <p className="text-sm text-slate-600">Description</p>
-                <p className="text-slate-900">{viewingTask.description || '-'}</p>
+                <Label>Description</Label>
+                <p className="text-sm text-slate-600 mt-1">{viewingTask.description || '-'}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-slate-600">Assigné à</p>
-                  <p className="text-slate-900">{viewingTask.assignedToName || '-'}</p>
+                  <Label>Assigné à</Label>
+                  <p className="text-sm text-slate-600 mt-1">{viewingTask.assignedToName || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-600">Priorité</p>
-                  <Badge className={PRIORITY_COLORS[viewingTask.priority]}>
+                  <Label>Priorité</Label>
+                  <Badge className={PRIORITY_COLORS[viewingTask.priority] || ''}>
                     {PRIORITY_LABELS[viewingTask.priority]}
                   </Badge>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-slate-600">Date de début</p>
-                  <p className="text-slate-900">{format(new Date(viewingTask.startDate), 'dd MMMM yyyy', { locale: fr })}</p>
+                  <Label>Statut</Label>
+                  <Badge className={STATUS_COLORS[viewingTask.status] || ''}>
+                    {STATUS_LABELS[viewingTask.status]}
+                  </Badge>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-600">Échéance</p>
-                  <p className="text-slate-900">{format(new Date(viewingTask.dueDate), 'dd MMMM yyyy', { locale: fr })}</p>
+                  <Label>Progrès</Label>
+                  <p className="text-sm text-slate-600 mt-1">{viewingTask.progress}%</p>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-600 mb-2">Progression</p>
-                <Progress value={viewingTask.progress} className="h-2" />
-                <p className="text-sm text-slate-600 mt-1">{viewingTask.progress}%</p>
-              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
