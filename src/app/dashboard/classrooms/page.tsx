@@ -35,6 +35,7 @@ export default function ClassroomsPage() {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -65,6 +66,7 @@ export default function ClassroomsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       const method = editingClassroom ? 'PUT' : 'POST';
 
@@ -82,13 +84,18 @@ export default function ClassroomsPage() {
         setDialogOpen(false);
         setEditingClassroom(null);
         setFormData({ name: '', code: '', capacity: '', building: '', floor: '', facilities: '' });
-        fetchClassrooms();
+        // Attendre un peu puis rafraîchir
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchClassrooms();
       } else {
         const data = await response.json();
         alert(data.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving classroom:', error);
+      alert('Erreur de connexion au serveur');
+    } finally {
+      setSaving(false);
     }
   };
 

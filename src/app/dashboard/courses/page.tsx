@@ -35,6 +35,7 @@ export default function CoursesPage() {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -64,6 +65,7 @@ export default function CoursesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       const url = editingCourse
         ? `/api/courses`
@@ -87,13 +89,18 @@ export default function CoursesPage() {
         setDialogOpen(false);
         setEditingCourse(null);
         setFormData({ name: '', code: '', description: '', duration: '', fee: '' });
-        fetchCourses();
+        // Attendre un peu puis rafraîchir
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchCourses();
       } else {
         const data = await response.json();
         alert(data.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving course:', error);
+      alert('Erreur de connexion au serveur');
+    } finally {
+      setSaving(false);
     }
   };
 

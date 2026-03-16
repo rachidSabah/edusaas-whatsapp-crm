@@ -83,6 +83,7 @@ export default function GroupsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setProcessing(true);
     try {
       const url = editingGroup
         ? `/api/groups?id=${editingGroup.id}`
@@ -100,6 +101,8 @@ export default function GroupsPage() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
         setDialogOpen(false);
         setEditingGroup(null);
@@ -114,10 +117,18 @@ export default function GroupsPage() {
           year2EndDate: '',
           currentYear: '1',
         });
-        fetchGroups();
+        // Attendre un peu puis rafraîchir
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchGroups();
+      } else {
+        console.error('Error response:', responseData);
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving group:', error);
+      alert('Erreur de connexion au serveur');
+    } finally {
+      setProcessing(false);
     }
   };
 
