@@ -52,3 +52,6 @@ server.log
 
 # examples
 /examples
+
+# baileys auth state
+auth_info_baileys/
