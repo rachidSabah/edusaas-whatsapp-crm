@@ -16,13 +16,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   MessageSquare, 
@@ -42,6 +35,8 @@ import {
   ArrowLeft,
   ArrowRight,
   RotateCcw,
+  QrCode,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -57,11 +52,12 @@ interface WhatsAppAccount {
   createdAt: string;
 }
 
-interface EmbeddedBrowserState {
-  url: string;
+interface QRState {
   isOpen: boolean;
-  isFullscreen: boolean;
-  phoneNumber: string;
+  accountId: string | null;
+  qrCodeUrl: string | null;
+  loading: boolean;
+  status: string;
   message: string;
 }
 
@@ -74,19 +70,20 @@ export default function WhatsAppPage() {
     accountName: '',
   });
   
-  
-  // Embedded browser state
-  const [browser, setBrowser] = useState<EmbeddedBrowserState>({
-    url: '',
+  // QR Code state
+  const [qrState, setQrState] = useState<QRState>({
     isOpen: false,
-    isFullscreen: false,
+    accountId: null,
+    qrCodeUrl: null,
+    loading: false,
+    status: 'idle',
+    message: '',
+  });
+
+  const [quickSend, setQuickSend] = useState({
     phoneNumber: '',
     message: '',
   });
-  
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [browserHistory, setBrowserHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
 
   const fetchAccounts = async () => {
     try {
@@ -141,46 +138,83 @@ export default function WhatsAppPage() {
     }
   };
 
-  // Open WhatsApp Web in embedded browser
+  // Connect via Baileys QR Code
   const handleConnect = async (account: WhatsAppAccount) => {
-    // Format phone number for WhatsApp Web
-    const cleanPhone = account.phoneNumber.replace(/[^0-9]/g, '');
-    const whatsappUrl = `https://web.whatsapp.com`;
-    
-    setBrowser({
-      url: whatsappUrl,
+    setQrState({
+      ...qrState,
       isOpen: true,
-      isFullscreen: false,
-      phoneNumber: cleanPhone,
-      message: '',
+      accountId: account.id,
+      loading: true,
+      status: 'generating',
+      message: 'Génération du code QR...',
     });
-    
-    setBrowserHistory([whatsappUrl]);
-    setHistoryIndex(0);
-    
-    // Update account status
+
     try {
-      await fetch('/api/whatsapp-accounts', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: account.id, 
-          connectionStatus: 'connecting' 
-        }),
-      });
-      fetchAccounts();
+      const response = await fetch(`/api/whatsapp/qr?accountId=${account.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setQrState({
+          ...qrState,
+          isOpen: true,
+          accountId: account.id,
+          qrCodeUrl: data.qrCodeUrl,
+          loading: false,
+          status: 'waiting',
+          message: data.message,
+        });
+
+        // Start polling for status
+        startPollingStatus(account.id);
+      } else {
+        setQrState({
+          ...qrState,
+          loading: false,
+          status: 'error',
+          message: data.error || 'Erreur lors de la génération du QR code',
+        });
+      }
     } catch (error) {
-      console.error('Error updating account status:', error);
+      setQrState({
+        ...qrState,
+        loading: false,
+        status: 'error',
+        message: 'Erreur de connexion au service WhatsApp',
+      });
     }
   };
 
-  // Send message via wa.me link (opens in NEW WINDOW - cannot be embedded in iframe)
+  const startPollingStatus = (accountId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/whatsapp/qr?accountId=${accountId}`);
+        const data = await response.json();
+
+        if (data.connectionStatus === 'connected') {
+          clearInterval(interval);
+          setQrState(prev => ({
+            ...prev,
+            status: 'connected',
+            message: 'Connecté avec succès!',
+          }));
+          fetchAccounts();
+          setTimeout(() => {
+            setQrState(prev => ({ ...prev, isOpen: false }));
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 3000);
+
+    // Stop polling if modal is closed
+    return () => clearInterval(interval);
+  };
+
   const handleSendMessage = (phone: string, message: string = '') => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const encodedMessage = encodeURIComponent(message);
     const waUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodedMessage}` : ''}`;
-    
-    // Open in new window/tab - wa.me cannot be embedded in iframe
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -192,7 +226,6 @@ export default function WhatsAppPage() {
         body: JSON.stringify({ id, connectionStatus: 'disconnected' }),
       });
       if (response.ok) {
-        setBrowser({ ...browser, isOpen: false });
         fetchAccounts();
       }
     } catch (error) {
@@ -200,43 +233,8 @@ export default function WhatsAppPage() {
     }
   };
 
-  // Browser navigation
-  const handleGoBack = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setBrowser({ ...browser, url: browserHistory[newIndex] });
-    }
-  };
-
-  const handleGoForward = () => {
-    if (historyIndex < browserHistory.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setBrowser({ ...browser, url: browserHistory[newIndex] });
-    }
-  };
-
-  const handleRefresh = () => {
-    if (iframeRef.current) {
-      iframeRef.current.src = browser.url;
-    }
-  };
-
-  const handleNavigate = (url: string) => {
-    let fullUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      fullUrl = 'https://' + url;
-    }
-    setBrowser({ ...browser, url: fullUrl });
-    const newHistory = [...browserHistory.slice(0, historyIndex + 1), fullUrl];
-    setBrowserHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
   const handleSetDefault = async (id: string) => {
     try {
-      // Remove default from all accounts
       for (const account of accounts) {
         if (account.isDefault) {
           await fetch('/api/whatsapp-accounts', {
@@ -246,7 +244,6 @@ export default function WhatsAppPage() {
           });
         }
       }
-      // Set new default
       await fetch('/api/whatsapp-accounts', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -264,7 +261,7 @@ export default function WhatsAppPage() {
         return (
           <Badge className="bg-green-100 text-green-700">
             <CheckCircle className="w-3 h-3 mr-1" />
-            Connecté (API Meta)
+            Connecté
           </Badge>
         );
       case 'disconnected':
@@ -274,24 +271,15 @@ export default function WhatsAppPage() {
             Déconnecté
           </Badge>
         );
-      case 'pending':
+      case 'connecting':
         return (
           <Badge className="bg-yellow-100 text-yellow-700">
             <Clock className="w-3 h-3 mr-1" />
-            En attente
-          </Badge>
-        );
-      case 'connecting':
-        return (
-          <Badge className="bg-indigo-100 text-indigo-700">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Connecté (API Meta)
+            Connexion...
           </Badge>
         );
       default:
-        return (
-          <Badge variant="outline">{status}</Badge>
-        );
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -306,179 +294,132 @@ export default function WhatsAppPage() {
     });
   };
 
-  // Embedded Browser Component
-  const EmbeddedBrowser = () => (
-    <div className={cn(
-      "fixed bg-white z-50 flex flex-col shadow-2xl border border-slate-200",
-      browser.isFullscreen 
-        ? "inset-0 rounded-none" 
-        : "inset-4 rounded-xl"
-    )}>
-      {/* Browser Title Bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-100 border-b border-slate-200 rounded-t-xl">
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5">
-            <button 
-              onClick={() => setBrowser({ ...browser, isOpen: false })}
-              className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition"
-            />
-            <button 
-              onClick={() => setBrowser({ ...browser, isFullscreen: !browser.isFullscreen })}
-              className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition"
-            />
-            <button 
-              onClick={() => setBrowser({ ...browser, isFullscreen: !browser.isfullscreen })}
-              className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition"
-            />
-          </div>
-        </div>
-        <div className="text-xs text-slate-500">WhatsApp Web</div>
-        <button
-          onClick={() => setBrowser({ ...browser, isOpen: false })}
-          className="text-slate-400 hover:text-slate-600"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Browser Address Bar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200">
-        <button 
-          onClick={handleGoBack}
-          disabled={historyIndex <= 0}
-          className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-30"
-        >
-          <ArrowLeft className="w-4 h-4 text-slate-600" />
-        </button>
-        <button 
-          onClick={handleGoForward}
-          disabled={historyIndex >= browserHistory.length - 1}
-          className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-30"
-        >
-          <ArrowRight className="w-4 h-4 text-slate-600" />
-        </button>
-        <button 
-          onClick={handleRefresh}
-          className="p-1.5 rounded hover:bg-slate-200"
-        >
-          <RotateCcw className="w-4 h-4 text-slate-600" />
-        </button>
-        <div className="flex-1 flex items-center bg-white rounded-full border border-slate-200 px-3 py-1.5">
-          <svg className="w-4 h-4 mr-2 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-          </svg>
-          <input
-            type="text"
-            value={browser.url}
-            onChange={(e) => setBrowser({ ...browser, url: e.target.value })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleNavigate(browser.url);
-              }
-            }}
-            className="flex-1 text-sm outline-none text-slate-700"
-            placeholder="Entrez une URL..."
-          />
-        </div>
-        <button
-          onClick={() => setBrowser({ ...browser, isFullscreen: !browser.isFullscreen })}
-          className="p-1.5 rounded hover:bg-slate-200"
-        >
-          {browser.isFullscreen ? (
-            <Minimize2 className="w-4 h-4 text-slate-600" />
-          ) : (
-            <Maximize2 className="w-4 h-4 text-slate-600" />
-          )}
-        </button>
-      </div>
-
-      {/* Browser Content */}
-      <div className="flex-1 bg-white overflow-hidden">
-        {browser.url.includes('web.whatsapp.com') ? (
-          <iframe
-            ref={iframeRef}
-            src={browser.url}
-            className="w-full h-full border-0"
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-            allow="camera; microphone; fullscreen"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full bg-slate-50">
+  return (
+    <div className="space-y-6">
+      {/* QR Code Modal */}
+      <Dialog open={qrState.isOpen} onOpenChange={(open) => setQrState({ ...qrState, isOpen: open })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connexion WhatsApp Baileys</DialogTitle>
+            <DialogDescription>
+              Scannez ce code QR avec votre application WhatsApp sur votre téléphone
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6 space-y-4">
+            {qrState.loading ? (
+              <div className="flex flex-col items-center space-y-2">
+                <Loader2 className="w-12 h-12 animate-spin text-green-600" />
+                <p className="text-sm text-slate-500">{qrState.message}</p>
+              </div>
+            ) : qrState.qrCodeUrl ? (
+              <div className="relative p-4 bg-white rounded-xl border-2 border-slate-100 shadow-inner">
+                <img 
+                  src={qrState.qrCodeUrl} 
+                  alt="WhatsApp QR Code" 
+                  className="w-64 h-64"
+                />
+                {qrState.status === 'connected' && (
+                  <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl">
+                    <CheckCircle className="w-16 h-16 text-green-500 mb-2" />
+                    <p className="font-bold text-green-700">Connecté!</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <XCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+                <p className="text-sm text-red-600">{qrState.message}</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => qrState.accountId && handleConnect(accounts.find(a => a.id === qrState.accountId)!)}
+                >
+                  Réessayer
+                </Button>
+              </div>
+            )}
             <div className="text-center">
-              <MessageSquare className="w-16 h-16 mx-auto mb-4 text-green-600" />
-              <p className="text-slate-600">Navigateur intégré WhatsApp Web</p>
-              <p className="text-sm text-slate-400 mt-2">
-                Connectez votre compte WhatsApp via le navigateur intégré
+              <p className="text-sm font-medium text-slate-700">{qrState.message}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Allez dans WhatsApp &gt; Appareils connectés &gt; Connecter un appareil
               </p>
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Embedded Browser Modal */}
-      {browser.isOpen && <EmbeddedBrowser />}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQrState({ ...qrState, isOpen: false })}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">WhatsApp</h1>
-          <p className="text-slate-600">Gérez vos comptes WhatsApp (jusqu'à 2 comptes)</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-slate-600">Gérez vos comptes WhatsApp</p>
+            <Badge variant="outline" className="text-xs">Baileys (Gratuit)</Badge>
+          </div>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              className="bg-gradient-to-r from-green-500 to-emerald-600"
-              disabled={accounts.length >= 2}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter un compte
-              {accounts.length >= 2 && <span className="ml-1 text-xs">(max 2)</span>}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter un compte WhatsApp</DialogTitle>
-              <DialogDescription>
-                Entrez le numéro de téléphone du compte WhatsApp à connecter
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
-                  <Input
-                    id="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    placeholder="Ex: +212 6XX XXX XXX"
-                    required
-                  />
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => window.location.href = '/dashboard/whatsapp/meta-setup'}
+          >
+            Configuration Meta API
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                className="bg-gradient-to-r from-green-500 to-emerald-600"
+                disabled={accounts.length >= 2}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter un compte
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajouter un compte WhatsApp</DialogTitle>
+                <DialogDescription>
+                  Entrez le numéro de téléphone du compte WhatsApp à connecter
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
+                    <Input
+                      id="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      placeholder="Ex: +212 6XX XXX XXX"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accountName">Nom du compte (optionnel)</Label>
+                    <Input
+                      id="accountName"
+                      value={formData.accountName}
+                      onChange={(e) => setFormData({ ...formData, accountName: e.target.value })}
+                      placeholder="Ex: Compte principal, Support..."
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accountName">Nom du compte (optionnel)</Label>
-                  <Input
-                    id="accountName"
-                    value={formData.accountName}
-                    onChange={(e) => setFormData({ ...formData, accountName: e.target.value })}
-                    placeholder="Ex: Compte principal, Support..."
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit" className="bg-gradient-to-r from-green-500 to-emerald-600">
-                  Ajouter
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button type="submit" className="bg-gradient-to-r from-green-500 to-emerald-600">
+                    Ajouter
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Quick Send */}
@@ -489,7 +430,7 @@ export default function WhatsAppPage() {
             Envoi Rapide WhatsApp
           </CardTitle>
           <CardDescription>
-            Envoyez un message WhatsApp directement via wa.me (ouvre dans un nouvel onglet)
+            Envoyez un message WhatsApp directement via wa.me
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -497,23 +438,23 @@ export default function WhatsAppPage() {
             <div className="space-y-2">
               <Label>Numéro de téléphone</Label>
               <Input
-                value={browser.phoneNumber}
-                onChange={(e) => setBrowser({ ...browser, phoneNumber: e.target.value })}
+                value={quickSend.phoneNumber}
+                onChange={(e) => setQuickSend({ ...quickSend, phoneNumber: e.target.value })}
                 placeholder="+212 6XX XXX XXX"
               />
             </div>
             <div className="space-y-2">
               <Label>Message (optionnel)</Label>
               <Input
-                value={browser.message}
-                onChange={(e) => setBrowser({ ...browser, message: e.target.value })}
+                value={quickSend.message}
+                onChange={(e) => setQuickSend({ ...quickSend, message: e.target.value })}
                 placeholder="Bonjour..."
               />
             </div>
             <div className="flex items-end">
               <Button
-                onClick={() => handleSendMessage(browser.phoneNumber, browser.message)}
-                disabled={!browser.phoneNumber}
+                onClick={() => handleSendMessage(quickSend.phoneNumber, quickSend.message)}
+                disabled={!quickSend.phoneNumber}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -521,9 +462,6 @@ export default function WhatsAppPage() {
               </Button>
             </div>
           </div>
-          <p className="text-xs text-slate-500 mt-3">
-            Format utilisé: https://wa.me/[numéro]?text=[message] - S'ouvre dans un nouvel onglet
-          </p>
         </CardContent>
       </Card>
 
@@ -541,7 +479,7 @@ export default function WhatsAppPage() {
                   <MessageSquare className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <h3 className="text-lg font-medium text-slate-900 mb-2">Aucun compte WhatsApp</h3>
                   <p className="text-slate-500 mb-4">
-                    Connectez votre premier compte WhatsApp pour commencer à envoyer des messages
+                    Connectez votre premier compte WhatsApp pour commencer
                   </p>
                   <Button
                     onClick={() => setDialogOpen(true)}
@@ -587,7 +525,7 @@ export default function WhatsAppPage() {
                         className="text-green-600 hover:text-green-700"
                         onClick={() => handleSetDefault(account.id)}
                       >
-                        Définir par défaut
+                        Par défaut
                       </Button>
                     )}
                     <Button
@@ -606,8 +544,6 @@ export default function WhatsAppPage() {
                   <span className="text-sm text-slate-600">Statut</span>
                   {getStatusBadge(account.connectionStatus)}
                 </div>
-                
-                
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Dernière connexion</span>
                   <span className="text-slate-500">{formatDate(account.lastConnected)}</span>
@@ -626,10 +562,10 @@ export default function WhatsAppPage() {
                       </Button>
                       <Button
                         className="flex-1 bg-green-600 hover:bg-green-700"
-                        onClick={() => handleSendMessage(account.phoneNumber.replace(/[^0-9]/g, ''))}
+                        onClick={() => handleSendMessage(account.phoneNumber)}
                       >
                         <Send className="w-4 h-4 mr-2" />
-                        Ouvrir WhatsApp
+                        Ouvrir
                       </Button>
                     </>
                   ) : (
@@ -637,8 +573,8 @@ export default function WhatsAppPage() {
                       className="flex-1 bg-green-600 hover:bg-green-700"
                       onClick={() => handleConnect(account)}
                     >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Connecter WhatsApp Web
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Afficher le Code QR
                     </Button>
                   )}
                 </div>
@@ -654,11 +590,9 @@ export default function WhatsAppPage() {
           <div className="flex items-start gap-3">
             <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-blue-900">Comment utiliser WhatsApp avec EduSaaS?</h4>
+              <h4 className="font-medium text-blue-900">Comment utiliser WhatsApp Baileys?</h4>
               <p className="text-sm text-blue-700 mt-1">
-                <strong>Méthode 1 - Envoi direct:</strong> Utilisez l'envoi rapide pour ouvrir WhatsApp avec le numéro et message pré-remplis.<br/>
-                <strong>Méthode 2 - WhatsApp Web:</strong> Cliquez sur "Connecter WhatsApp Web" pour utiliser WhatsApp dans le navigateur intégré.<br/>
-                <strong>Note:</strong> wa.me ouvre WhatsApp dans un nouvel onglet. Vous pouvez configurer jusqu'à 2 comptes WhatsApp.
+                Cliquez sur "Afficher le Code QR" pour générer un code de connexion. Scannez-le avec votre application WhatsApp mobile. Cette méthode est gratuite et ne nécessite pas l'API Meta Business.
               </p>
             </div>
           </div>

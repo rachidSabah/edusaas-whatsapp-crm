@@ -63,13 +63,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Return QR code data (in production, this would generate actual QR code)
+    // For testing/demo purposes, we'll simulate a connection after 10 seconds
+    const isConnecting = account.connectionStatus === 'connecting';
+    
     return NextResponse.json({
       success: true,
       sessionToken,
       accountId,
       phoneNumber: account.phoneNumber,
       connectionStatus: account.connectionStatus,
-      qrCodeUrl: `/api/whatsapp/qr-image?sessionToken=${sessionToken}`,
+      qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(sessionToken)}`,
       message: 'Scannez le code QR avec votre application WhatsApp',
     });
   } catch (error: any) {
