@@ -5,9 +5,6 @@ import { requireAuth } from '@/lib/auth-edge';
 import { getDbContext } from '@/lib/db-context';
 import { sendWhatsAppMessage, type WhatsAppConfig } from '@/modules/whatsapp';
 
-// WhatsApp Service URL (mini-service running on port 3030)
-const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3030';
-
 interface Template {
   id: string;
   name: string;
@@ -208,37 +205,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try to send via WhatsApp API if configured
-    let sendResult = { success: true, messageId: `msg_${Date.now()}` };
+    let sendResult = { success: false, messageId: '', error: 'Configuration introuvable' };
     
-    // First, try the local Baileys-based WhatsApp service
-    try {
-      const baileysResponse = await fetch(`${WHATSAPP_SERVICE_URL}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: user.organizationId,
-          to,
-          message: finalMessage
-        })
-      });
-      
-      if (baileysResponse.ok) {
-        const baileysResult = await baileysResponse.json();
-        if (baileysResult.success) {
-          sendResult = { success: true, messageId: baileysResult.messageId || `msg_${Date.now()}` };
-        } else {
-          // Baileys service failed, try configured provider
-          console.log('Baileys service failed, trying configured provider...');
-        }
-      }
-    } catch (e) {
-      // Baileys service not available, fall through to configured provider
-      console.log('Baileys service not available, using configured provider');
-    }
-    
-    // If Baileys didn't work, try configured WhatsApp provider
-    if (sendResult.success === false && waConfigs.length > 0) {
+    // Send using Meta Business API Configuration
+    if (waConfigs.length > 0) {
       const config = waConfigs[0];
       const waConfig: WhatsAppConfig = {
         provider: config.provider as 'evolution' | 'business-api' | 'custom',
@@ -249,19 +219,6 @@ export async function POST(request: NextRequest) {
       };
       
       sendResult = await sendWhatsAppMessage(waConfig, to, finalMessage);
-    } else if (waConfigs.length > 0 && !sendResult.messageId?.startsWith('wa_')) {
-      // Try configured provider as well for comparison
-      const config = waConfigs[0];
-      const waConfig: WhatsAppConfig = {
-        provider: config.provider as 'evolution' | 'business-api' | 'custom',
-        apiUrl: config.apiUrl,
-        apiKey: config.apiKey,
-        instanceId: config.instanceId || undefined,
-        organizationId: user.organizationId,
-      };
-      
-      // Don't override if Baileys already succeeded
-      // sendResult = await sendWhatsAppMessage(waConfig, to, finalMessage);
     }
 
     // Store outgoing message

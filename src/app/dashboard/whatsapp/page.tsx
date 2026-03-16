@@ -42,16 +42,8 @@ import {
   ArrowLeft,
   ArrowRight,
   RotateCcw,
-  QrCode,
-  Loader2,
-  AlertCircle,
-  Wifi,
-  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// WhatsApp Service URL
-const WHATSAPP_SERVICE_URL = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3030';
 
 interface WhatsAppAccount {
   id: string;
@@ -73,12 +65,6 @@ interface EmbeddedBrowserState {
   message: string;
 }
 
-interface WhatsAppConnectionStatus {
-  status: 'connecting' | 'connected' | 'disconnected';
-  qrCode?: string;
-  phone?: string;
-}
-
 export default function WhatsAppPage() {
   const [accounts, setAccounts] = useState<WhatsAppAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,12 +74,6 @@ export default function WhatsAppPage() {
     accountName: '',
   });
   
-  // Baileys connection state
-  const [connectionStatus, setConnectionStatus] = useState<WhatsAppConnectionStatus>({
-    status: 'disconnected'
-  });
-  const [connecting, setConnecting] = useState(false);
-  const [qrPolling, setQrPolling] = useState<NodeJS.Timeout | null>(null);
   
   // Embedded browser state
   const [browser, setBrowser] = useState<EmbeddedBrowserState>({
@@ -119,104 +99,6 @@ export default function WhatsAppPage() {
       setLoading(false);
     }
   };
-
-  // Fetch Baileys connection status
-  const fetchConnectionStatus = async () => {
-    try {
-      // Get the current user's organization ID from the session
-      const sessionRes = await fetch('/api/auth/session');
-      const sessionData = await sessionRes.json();
-      
-      if (!sessionData.user?.organizationId) {
-        return;
-      }
-
-      const response = await fetch(`${WHATSAPP_SERVICE_URL}/status?organizationId=${sessionData.user.organizationId}&XTransformPort=3030`);
-      if (response.ok) {
-        const data = await response.json();
-        setConnectionStatus({
-          status: data.status,
-          qrCode: data.qrCode,
-          phone: data.phone,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching connection status:', error);
-    }
-  };
-
-  // Connect to WhatsApp via Baileys
-  const handleBaileysConnect = async () => {
-    setConnecting(true);
-    try {
-      const sessionRes = await fetch('/api/auth/session');
-      const sessionData = await sessionRes.json();
-      
-      if (!sessionData.user?.organizationId) {
-        alert('Vous devez être connecté à une organisation');
-        setConnecting(false);
-        return;
-      }
-
-      const response = await fetch(`${WHATSAPP_SERVICE_URL}/connect?XTransformPort=3030`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId: sessionData.user.organizationId }),
-      });
-
-      if (response.ok) {
-        // Start polling for QR code
-        const pollInterval = setInterval(async () => {
-          await fetchConnectionStatus();
-        }, 2000);
-        
-        setQrPolling(pollInterval);
-      }
-    } catch (error) {
-      console.error('Error connecting:', error);
-    }
-  };
-
-  // Disconnect from WhatsApp
-  const handleBaileysDisconnect = async () => {
-    try {
-      const sessionRes = await fetch('/api/auth/session');
-      const sessionData = await sessionRes.json();
-      
-      if (qrPolling) {
-        clearInterval(qrPolling);
-        setQrPolling(null);
-      }
-
-      await fetch(`${WHATSAPP_SERVICE_URL}/disconnect?XTransformPort=3030`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId: sessionData.user?.organizationId }),
-      });
-
-      setConnectionStatus({ status: 'disconnected' });
-    } catch (error) {
-      console.error('Error disconnecting:', error);
-    }
-  };
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (qrPolling) {
-        clearInterval(qrPolling);
-      }
-    };
-  }, [qrPolling]);
-
-  // Stop polling when connected
-  useEffect(() => {
-    if (connectionStatus.status === 'connected' && qrPolling) {
-      clearInterval(qrPolling);
-      setQrPolling(null);
-      setConnecting(false);
-    }
-  }, [connectionStatus.status, qrPolling]);
 
   useEffect(() => {
     fetchAccounts();
@@ -382,7 +264,7 @@ export default function WhatsAppPage() {
         return (
           <Badge className="bg-green-100 text-green-700">
             <CheckCircle className="w-3 h-3 mr-1" />
-            Connecté
+            Connecté (API Meta)
           </Badge>
         );
       case 'disconnected':
@@ -401,9 +283,9 @@ export default function WhatsAppPage() {
         );
       case 'connecting':
         return (
-          <Badge className="bg-blue-100 text-blue-700">
-            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-            Connexion...
+          <Badge className="bg-indigo-100 text-indigo-700">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Connecté (API Meta)
           </Badge>
         );
       default:
@@ -645,94 +527,6 @@ export default function WhatsAppPage() {
         </CardContent>
       </Card>
 
-      {/* Baileys WhatsApp Connection */}
-      <Card className="border-0 shadow-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {connectionStatus.status === 'connected' ? (
-              <Wifi className="w-5 h-5 text-green-600" />
-            ) : (
-              <WifiOff className="w-5 h-5 text-slate-400" />
-            )}
-            WhatsApp Baileys (Gratuit)
-          </CardTitle>
-          <CardDescription>
-            Connectez WhatsApp via le service Baileys - Aucun frais API
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {connectionStatus.status === 'connected' ? (
-            <div className="space-y-4">
-              <Alert className="bg-green-50 border-green-200">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-800">WhatsApp Connecté</AlertTitle>
-                <AlertDescription className="text-green-700">
-                  {connectionStatus.phone && `Numéro: ${connectionStatus.phone}`}
-                  <br />
-                  Vous pouvez maintenant envoyer et recevoir des messages automatiquement.
-                </AlertDescription>
-              </Alert>
-              <Button
-                onClick={handleBaileysDisconnect}
-                variant="outline"
-                className="w-full"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Déconnecter WhatsApp
-              </Button>
-            </div>
-          ) : connectionStatus.status === 'connecting' || connecting ? (
-            <div className="space-y-4">
-              <Alert className="bg-blue-50 border-blue-200">
-                <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                <AlertTitle className="text-blue-800">Connexion en cours...</AlertTitle>
-                <AlertDescription className="text-blue-700">
-                  Scannez le code QR avec votre application WhatsApp
-                </AlertDescription>
-              </Alert>
-              {connectionStatus.qrCode && (
-                <div className="bg-white p-4 rounded-lg border text-center">
-                  <pre className="text-xs font-mono whitespace-pre-wrap bg-slate-100 p-4 rounded">
-                    {connectionStatus.qrCode.substring(0, 100)}...
-                  </pre>
-                  <p className="text-sm text-slate-500 mt-2">
-                    QR Code affiché dans le terminal du service WhatsApp
-                  </p>
-                </div>
-              )}
-              <Button
-                onClick={handleBaileysDisconnect}
-                variant="outline"
-                className="w-full"
-              >
-                Annuler
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Alert className="bg-slate-50 border-slate-200">
-                <AlertCircle className="h-4 w-4 text-slate-600" />
-                <AlertTitle className="text-slate-800">WhatsApp Non Connecté</AlertTitle>
-                <AlertDescription className="text-slate-600">
-                  Cliquez sur le bouton ci-dessous pour connecter votre compte WhatsApp.
-                  Un QR code sera généré pour l'authentification.
-                </AlertDescription>
-              </Alert>
-              <Button
-                onClick={handleBaileysConnect}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                <QrCode className="w-4 h-4 mr-2" />
-                Connecter WhatsApp
-              </Button>
-            </div>
-          )}
-          <p className="text-xs text-slate-500 mt-3">
-            Service Baileys sur le port 3030 - Solution gratuite pour WhatsApp Web
-          </p>
-        </CardContent>
-      </Card>
-
       {/* Accounts Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {loading ? (
@@ -813,15 +607,6 @@ export default function WhatsAppPage() {
                   {getStatusBadge(account.connectionStatus)}
                 </div>
                 
-                {account.deviceId && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Appareil</span>
-                    <div className="flex items-center gap-1 text-slate-500">
-                      <Smartphone className="w-3 h-3" />
-                      <span className="truncate max-w-[120px]">{account.deviceId}</span>
-                    </div>
-                  </div>
-                )}
                 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Dernière connexion</span>
