@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,10 +23,11 @@ import {
   Upload,
   FileText,
   AlertCircle,
-  Loader,
+  Loader2,
   Edit2,
   CheckCircle,
   BookOpen,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,21 +41,30 @@ interface KnowledgeItem {
   createdAt: string;
 }
 
+interface UploadedFile {
+  name: string;
+  size: number;
+  type: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
+
 export default function KnowledgeBasePage() {
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragAreaRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     question: '',
     answer: '',
-    category: 'General',
+    category: 'Général',
   });
-
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadMessage, setUploadMessage] = useState('');
 
   const fetchItems = async () => {
     try {
@@ -94,9 +104,14 @@ export default function KnowledgeBasePage() {
 
       if (response.ok) {
         setDialogOpen(false);
-        setFormData({ question: '', answer: '', category: 'General' });
+        setFormData({ question: '', answer: '', category: 'Général' });
         setEditingId(null);
         fetchItems();
+        setUploadMessage({
+          type: 'success',
+          text: editingId ? 'Q&R modifiée avec succès' : 'Q&R ajoutée avec succès',
+        });
+        setTimeout(() => setUploadMessage(null), 3000);
       } else {
         const data = await response.json();
         alert(data.error || 'Erreur lors de la sauvegarde');
@@ -127,6 +142,8 @@ export default function KnowledgeBasePage() {
 
       if (response.ok) {
         fetchItems();
+        setUploadMessage({ type: 'success', text: 'Q&R supprimée' });
+        setTimeout(() => setUploadMessage(null), 3000);
       } else {
         alert('Erreur lors de la suppression');
       }
@@ -136,15 +153,41 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const handleFileUpload = async (e: React.FormEvent) => {
+  // Drag and Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.add('bg-blue-50', 'border-blue-400');
+    }
+  };
 
-    if (!uploadFile) {
-      alert('Veuillez sélectionner un fichier');
-      return;
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.remove('bg-blue-50', 'border-blue-400');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragAreaRef.current) {
+      dragAreaRef.current.classList.remove('bg-blue-50', 'border-blue-400');
     }
 
-    const allowedTypes = [
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    handleFiles(files);
+  };
+
+  const handleFiles = async (files: File[]) => {
+    const validTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
@@ -153,61 +196,124 @@ export default function KnowledgeBasePage() {
       'image/gif',
     ];
 
-    if (!allowedTypes.includes(uploadFile.type)) {
-      alert('Format de fichier non supporté. Utilisez PDF, DOCX, TXT ou images.');
-      return;
+    const newFiles: UploadedFile[] = files
+      .filter((file) => validTypes.includes(file.type))
+      .map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        progress: 0,
+        status: 'pending' as const,
+      }));
+
+    if (files.some((f) => !validTypes.includes(f.type))) {
+      setUploadMessage({
+        type: 'error',
+        text: 'Certains fichiers ne sont pas supportés. Utilisez PDF, DOCX, TXT ou images.',
+      });
     }
 
-    setUploading(true);
-    setUploadMessage('');
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('file', uploadFile);
-
-      const response = await fetch('/api/whatsapp/knowledge-base/upload', {
-        method: 'POST',
-        body: formDataToSend,
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUploadMessage(`✓ Fichier traité avec succès! ${data.itemsCreated} éléments ajoutés.`);
-        setUploadFile(null);
-        fetchItems();
-      } else {
-        setUploadMessage(`Erreur: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      setUploadMessage('Erreur lors de l\'upload du fichier');
-    } finally {
-      setUploading(false);
+    // Process each file
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) continue;
+      await processFile(file);
     }
   };
 
+  const processFile = async (file: File) => {
+    try {
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name ? { ...f, status: 'uploading' as const, progress: 30 } : f
+        )
+      );
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/whatsapp/knowledge-base/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+
+      // Add extracted items to knowledge base
+      if (data.items && data.items.length > 0) {
+        const newItems = data.items.map((item: any) => ({
+          id: `kb_${Date.now()}_${Math.random()}`,
+          question: item.question,
+          answer: item.answer,
+          category: item.category || 'Document',
+          source: 'document' as const,
+          sourceFile: file.name,
+          createdAt: new Date().toISOString().split('T')[0],
+        }));
+
+        setItems((prev) => [...prev, ...newItems]);
+      }
+
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name
+            ? { ...f, status: 'success' as const, progress: 100 }
+            : f
+        )
+      );
+
+      setUploadMessage({
+        type: 'success',
+        text: `${file.name} traité avec succès. ${data.items?.length || 0} Q&R extraites.`,
+      });
+    } catch (error) {
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.name === file.name
+            ? {
+                ...f,
+                status: 'error' as const,
+                error: 'Erreur lors du traitement',
+              }
+            : f
+        )
+      );
+
+      setUploadMessage({
+        type: 'error',
+        text: `Erreur lors du traitement de ${file.name}`,
+      });
+    }
+
+    setTimeout(() => setUploadMessage(null), 5000);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Base de Connaissance</h1>
           <p className="text-slate-600 mt-2">
-            Gérez les questions/réponses pour l'IA WhatsApp
+            Gérez vos Q&R et uploadez des documents pour que l'IA apprenne et réponde automatiquement
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button
-              className="bg-gradient-to-r from-blue-500 to-blue-600"
+              className="bg-green-600 hover:bg-green-700"
               onClick={() => {
                 setEditingId(null);
-                setFormData({ question: '', answer: '', category: 'General' });
+                setFormData({ question: '', answer: '', category: 'Général' });
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Ajouter une Q&R
+              Nouvelle Q&R
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -221,6 +327,17 @@ export default function KnowledgeBasePage() {
             </DialogHeader>
             <form onSubmit={handleAddItem}>
               <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Catégorie</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    placeholder="Ex: Horaires, Contact, Absences..."
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="question">Question</Label>
                   <Input
@@ -246,17 +363,6 @@ export default function KnowledgeBasePage() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Catégorie</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    placeholder="Ex: Horaires, Tarifs, Général..."
-                  />
-                </div>
               </div>
               <DialogFooter>
                 <Button
@@ -268,7 +374,7 @@ export default function KnowledgeBasePage() {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-blue-600"
+                  className="bg-green-600 hover:bg-green-700"
                 >
                   {editingId ? 'Modifier' : 'Ajouter'}
                 </Button>
@@ -278,7 +384,24 @@ export default function KnowledgeBasePage() {
         </Dialog>
       </div>
 
-      {/* File Upload Card */}
+      {/* Messages */}
+      {uploadMessage && (
+        <Alert className={uploadMessage.type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
+          {uploadMessage.type === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-600" />
+          )}
+          <AlertTitle className={uploadMessage.type === 'success' ? 'text-green-900' : 'text-red-900'}>
+            {uploadMessage.type === 'success' ? 'Succès' : 'Erreur'}
+          </AlertTitle>
+          <AlertDescription className={uploadMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+            {uploadMessage.text}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Upload Section */}
       <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -286,153 +409,131 @@ export default function KnowledgeBasePage() {
             Importer des Documents
           </CardTitle>
           <CardDescription>
-            Téléchargez des fichiers (PDF, DOCX, TXT) pour extraire automatiquement les Q&R
+            Uploadez des fichiers PDF, DOCX, TXT ou des images pour que l'IA extraie automatiquement les Q&R
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleFileUpload} className="space-y-4">
-            <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-400 transition">
-              <input
-                type="file"
-                id="fileInput"
-                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.gif"
-                className="hidden"
-              />
-              <label htmlFor="fileInput" className="cursor-pointer">
-                <FileText className="w-12 h-12 mx-auto mb-2 text-blue-400" />
-                <p className="font-medium text-slate-900">
-                  {uploadFile ? uploadFile.name : 'Cliquez pour sélectionner un fichier'}
-                </p>
-                <p className="text-sm text-slate-500">
-                  PDF, DOCX, TXT ou images (JPG, PNG, GIF)
-                </p>
-              </label>
+        <CardContent className="space-y-4">
+          {/* Drag & Drop Area */}
+          <div
+            ref={dragAreaRef}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-blue-400 hover:bg-blue-50"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <FileText className="w-12 h-12 text-blue-400" />
+              <div>
+                <p className="font-semibold text-slate-900">Déposez vos fichiers ici</p>
+                <p className="text-sm text-slate-600">ou cliquez pour sélectionner</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Formats supportés: PDF, DOCX, TXT, JPG, PNG, GIF (Max 10MB)
+              </p>
             </div>
-
-            {uploadMessage && (
-              <Alert
-                className={cn(
-                  uploadMessage.startsWith('✓')
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
-                )}
-              >
-                <AlertCircle
-                  className={cn(
-                    'w-4 h-4',
-                    uploadMessage.startsWith('✓')
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  )}
-                />
-                <AlertDescription
-                  className={uploadMessage.startsWith('✓') ? 'text-green-700' : 'text-red-700'}
-                >
-                  {uploadMessage}
-                </AlertDescription>
-              </Alert>
-            )}
-
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.gif"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
             <Button
-              type="submit"
-              disabled={!uploadFile || uploading}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-4"
             >
-              {uploading ? (
-                <>
-                  <Loader className="w-4 h-4 mr-2 animate-spin" />
-                  Traitement en cours...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importer et Traiter
-                </>
-              )}
+              <Upload className="w-4 h-4 mr-2" />
+              Sélectionner des fichiers
             </Button>
-          </form>
+          </div>
+
+          {/* Uploaded Files List */}
+          {uploadedFiles.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-slate-900">Fichiers en cours</h3>
+              {uploadedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+                  <FileText className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(2)} KB</p>
+                  </div>
+                  {file.status === 'uploading' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 transition-all"
+                          style={{ width: `${file.progress}%` }}
+                        />
+                      </div>
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    </div>
+                  )}
+                  {file.status === 'success' && (
+                    <Badge className="bg-green-100 text-green-700">✓ Traité</Badge>
+                  )}
+                  {file.status === 'error' && (
+                    <Badge className="bg-red-100 text-red-700">✗ Erreur</Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Knowledge Items List */}
+      {/* Knowledge Base Items */}
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-slate-900">Éléments de la Base</h2>
-
+        <h2 className="text-xl font-bold text-slate-900">Q&R Disponibles ({items.length})</h2>
         {loading ? (
-          <div className="text-center py-8 text-slate-500">Chargement...</div>
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          </div>
         ) : items.length === 0 ? (
-          <Card className="border-0 shadow-md">
-            <CardContent className="py-12">
-              <div className="text-center">
-                <BookOpen className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">
-                  Base de connaissance vide
-                </h3>
-                <p className="text-slate-500">
-                  Ajoutez des questions/réponses ou importez un document
-                </p>
-              </div>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="py-8 text-center">
+              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-600">Aucune Q&R pour le moment. Commencez par ajouter ou importer des documents.</p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4">
             {items.map((item) => (
-              <Card key={item.id} className="border-0 shadow-md hover:shadow-lg transition">
+              <Card key={item.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="py-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-slate-900 text-lg">
-                          {item.question}
-                        </h4>
-                        <div className="flex gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">
-                            {item.category}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="font-semibold text-slate-900">{item.question}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {item.category}
+                        </Badge>
+                        {item.source === 'document' && (
+                          <Badge className="bg-blue-100 text-blue-700 text-xs">
+                            📄 {item.sourceFile}
                           </Badge>
-                          <Badge
-                            className={cn(
-                              'text-xs',
-                              item.source === 'document'
-                                ? 'bg-purple-100 text-purple-700'
-                                : 'bg-blue-100 text-blue-700'
-                            )}
-                          >
-                            {item.source === 'document' ? '📄 Document' : '✍️ Manuel'}
-                          </Badge>
-                          {item.sourceFile && (
-                            <Badge variant="outline" className="text-xs">
-                              {item.sourceFile}
-                            </Badge>
-                          )}
-                        </div>
+                        )}
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditItem(item)}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500"
-                          onClick={() => handleDeleteItem(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <p className="text-slate-600 text-sm">{item.answer}</p>
+                      <p className="text-xs text-slate-500 mt-2">Ajoutée le {item.createdAt}</p>
                     </div>
-
-                    <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                      <p className="text-sm text-slate-700">{item.answer}</p>
-                    </div>
-
-                    <div className="text-xs text-slate-500">
-                      Créé le: {new Date(item.createdAt).toLocaleDateString('fr-FR')}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditItem(item)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteItem(item.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -441,21 +542,6 @@ export default function KnowledgeBasePage() {
           </div>
         )}
       </div>
-
-      {/* Info Card */}
-      <Card className="border-0 shadow-md bg-amber-50">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-amber-900">Comment ça marche?</h4>
-              <p className="text-sm text-amber-700 mt-1">
-                La base de connaissance est utilisée par l'IA Puter pour répondre automatiquement aux messages WhatsApp. Vous pouvez ajouter des Q&R manuellement ou importer des documents (PDF, DOCX). L'IA utilisera ces informations pour fournir des réponses précises et contextuelles.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

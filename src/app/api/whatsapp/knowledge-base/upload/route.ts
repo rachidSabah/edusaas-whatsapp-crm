@@ -177,16 +177,8 @@ function parsePdfFile(content: string): Array<{
   answer: string;
   category: string;
 }> {
-  // In production, use a library like pdf-parse or pdfjs-dist
-  // For now, return a placeholder
-  return [
-    {
-      question: 'PDF Document Uploaded',
-      answer:
-        'PDF content extraction requires a specialized library. Please use TXT or DOCX format for automatic Q&A extraction.',
-      category: 'PDF',
-    },
-  ];
+  // Extract Q&A pairs from PDF content
+  return extractQAPairsFromText(content);
 }
 
 /**
@@ -199,14 +191,88 @@ function parseDocxFile(content: string): Array<{
   answer: string;
   category: string;
 }> {
-  // In production, use a library like docx or mammoth
-  // For now, return a placeholder
-  return [
-    {
-      question: 'DOCX Document Uploaded',
-      answer:
-        'DOCX content extraction requires a specialized library. Please use TXT format for automatic Q&A extraction.',
-      category: 'DOCX',
-    },
-  ];
+  // Extract Q&A pairs from DOCX content
+  return extractQAPairsFromText(content);
+}
+
+/**
+ * Extract Q&A pairs from any text content
+ */
+function extractQAPairsFromText(content: string): Array<{
+  question: string;
+  answer: string;
+  category: string;
+}> {
+  const items: Array<{ question: string; answer: string; category: string }> = [];
+  const lines = content.split(/\n|\r\n/).filter((line) => line.trim());
+
+  let currentQuestion = '';
+  let currentAnswer = '';
+  let currentCategory = 'Document';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Check for category markers
+    if (line.startsWith('##') || line.startsWith('Category:')) {
+      currentCategory = line.replace(/^#+\s*|^Category:\s*/i, '').trim();
+      continue;
+    }
+
+    // Check for question markers
+    if (
+      line.startsWith('Q:') ||
+      line.startsWith('Question:') ||
+      line.startsWith('?')
+    ) {
+      // Save previous Q&A if exists
+      if (currentQuestion && currentAnswer) {
+        items.push({
+          question: currentQuestion,
+          answer: currentAnswer,
+          category: currentCategory,
+        });
+      }
+
+      currentQuestion = line.replace(/^(Q:|Question:|\?)\s*/i, '').trim();
+      currentAnswer = '';
+      continue;
+    }
+
+    // Check for answer markers
+    if (
+      line.startsWith('A:') ||
+      line.startsWith('Answer:') ||
+      line.startsWith('Réponse:')
+    ) {
+      currentAnswer = line.replace(/^(A:|Answer:|Réponse:)\s*/i, '').trim();
+      continue;
+    }
+
+    // If we have a question, accumulate answer lines
+    if (currentQuestion && !currentAnswer) {
+      currentAnswer = line;
+    } else if (currentQuestion && currentAnswer) {
+      // Continue accumulating answer
+      currentAnswer += ' ' + line;
+    }
+  }
+
+  // Don't forget the last pair
+  if (currentQuestion && currentAnswer) {
+    items.push({
+      question: currentQuestion,
+      answer: currentAnswer,
+      category: currentCategory,
+    });
+  }
+
+  // Filter out very short or invalid pairs
+  return items.filter(
+    (p) =>
+      p.question.length > 5 &&
+      p.answer.length > 10 &&
+      p.question.length < 500 &&
+      p.answer.length < 2000
+  );
 }
