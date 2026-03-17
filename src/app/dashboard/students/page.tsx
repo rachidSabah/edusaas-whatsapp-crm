@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -31,8 +32,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  GraduationCap, Plus, Search, Edit, AlertCircle, 
+import {
+  GraduationCap, Plus, Search, Edit, AlertCircle,
   Download, Upload, FileSpreadsheet, Loader2, MessageSquare, BookOpen, Eye
 } from 'lucide-react';
 import { LogbookModal } from '@/components/LogbookModal';
@@ -67,6 +68,7 @@ interface Group {
 }
 
 export default function StudentsPage() {
+  const router = useRouter();
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,6 @@ export default function StudentsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logbookOpen, setLogbookOpen] = useState(false);
   const [selectedStudentForLog, setSelectedStudentForLog] = useState<Student | null>(null);
-  const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -219,7 +220,7 @@ export default function StudentsPage() {
 
   // Export students to CSV
   const handleExportStudents = () => {
-    const headers = ['Prénom', 'Nom', 'Email', 'Téléphone', 'Programme', 'Groupe', 'Statut', 
+    const headers = ['Prénom', 'Nom', 'Email', 'Téléphone', 'Programme', 'Groupe', 'Statut',
                      'Parent 1 Nom', 'Parent 1 Téléphone', 'Parent 1 WhatsApp',
                      'Parent 2 Nom', 'Parent 2 Téléphone', 'Parent 2 WhatsApp'];
     
@@ -345,60 +346,28 @@ export default function StudentsPage() {
       ACTIVE: 'bg-green-100 text-green-700',
       INACTIVE: 'bg-slate-100 text-slate-700',
       GRADUATED: 'bg-blue-100 text-blue-700',
-      WITHDRAWN: 'bg-red-100 text-red-700',
-      ON_LEAVE: 'bg-yellow-100 text-yellow-700',
+      WITHDRAWN: 'bg-orange-100 text-orange-700',
     };
-    const labels: Record<string, string> = {
-      ACTIVE: 'Actif',
-      INACTIVE: 'Inactif',
-      GRADUATED: 'Diplômé',
-      WITHDRAWN: 'Retiré',
-      ON_LEAVE: 'En congé',
-    };
-    return (
-      <Badge className={colors[status] || colors.ACTIVE}>
-        {labels[status] || status}
-      </Badge>
-    );
+    return <Badge variant="outline" className={`${colors[status]} text-xs`}>{status}</Badge>;
   };
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Étudiants</h1>
-          <p className="text-slate-600">Gérez les étudiants de votre établissement</p>
-        </div>
-        <Card className="border-0 shadow-md">
-          <CardContent className="pt-6">
-            <div className="text-center py-8 text-red-500">
-              <AlertCircle className="w-12 h-12 mx-auto mb-3" />
-              <p>{error}</p>
-              <p className="text-sm text-slate-500 mt-2">Veuillez vous connecter avec un compte organisation.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Étudiants</h1>
-          <p className="text-slate-600">Gérez les étudiants de votre établissement</p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Étudiants</h1>
         <div className="flex items-center gap-2">
-          <input
+          <Input
             type="file"
-            ref={fileInputRef}
             accept=".csv"
             onChange={handleImportStudents}
+            ref={fileInputRef}
             className="hidden"
           />
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+          >
             {importing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -406,13 +375,13 @@ export default function StudentsPage() {
             )}
             Importer CSV
           </Button>
-          <Button variant="outline" onClick={handleExportStudents} disabled={students.length === 0}>
+          <Button variant="outline" onClick={handleExportStudents}>
             <Download className="w-4 h-4 mr-2" />
-            Exporter
+            Exporter CSV
           </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-green-500 to-emerald-600" onClick={() => {
+              <Button onClick={() => {
                 setEditingStudent(null);
                 setFormData({
                   firstName: '',
@@ -515,7 +484,7 @@ export default function StudentsPage() {
                   
                   {/* Parent 1 Information */}
                   <div className="col-span-2 mt-4">
-                    <h4 className="font-medium text-slate-900 mb-3 border-b pb-2">Parent 1</h4>
+                    <h4 className="font-medium text-slate-900 mb-3 border-b pb-2">Informations du Parent 1</h4>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="parent1Name">Nom du parent 1</Label>
@@ -550,7 +519,7 @@ export default function StudentsPage() {
                   
                   {/* Parent 2 Information */}
                   <div className="col-span-2 mt-4">
-                    <h4 className="font-medium text-slate-900 mb-3 border-b pb-2">Parent 2</h4>
+                    <h4 className="font-medium text-slate-900 mb-3 border-b pb-2">Informations du Parent 2</h4>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="parent2Name">Nom du parent 2</Label>
@@ -676,7 +645,7 @@ export default function StudentsPage() {
                 </TableRow>
               ) : (
                 students.map((student) => (
-                  <TableRow key={student.id} onDoubleClick={() => handleDoubleClick(student)} className="cursor-pointer hover:bg-slate-50">
+                  <TableRow key={student.id}>
                     <TableCell className="font-medium">
                       <div>
                         <p>{student.fullName}</p>
@@ -727,31 +696,21 @@ export default function StudentsPage() {
                     <TableCell>{student.program || '-'}</TableCell>
                     <TableCell>{getStatusBadge(student.status)}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Voir le profil (double-clic)"
-                          onClick={() => handleViewProfile(student)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Livret de bord"
-                          onClick={() => handleOpenLogbook(student)}
-                        >
-                          <BookOpen className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(student)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => router.push(`/dashboard/student-profile?id=${student.id}`)}
+                        title="Voir le profil étudiant"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(student)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -760,20 +719,6 @@ export default function StudentsPage() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Logbook Modal */}
-      {selectedStudentForLog && (
-        <LogbookModal
-          open={logbookOpen}
-          onOpenChange={setLogbookOpen}
-          studentId={selectedStudentForLog.id}
-          studentName={`${selectedStudentForLog.firstName} ${selectedStudentForLog.lastName}`}
-          onSuccess={() => {
-            // Refresh students list if needed
-            fetchStudents();
-          }}
-        />
-      )}
 
       {/* Import Help */}
       <Card className="border-0 shadow-md bg-slate-50">
