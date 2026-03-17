@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,20 @@ interface AttendanceRecord {
   remarks?: string;
 }
 
-export default function StudentProfilePage() {
+// Loading fallback component
+function ProfileLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-slate-600">Chargement du profil...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function StudentProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const studentId = searchParams.get('id');
@@ -71,7 +84,10 @@ export default function StudentProfilePage() {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
     fetchStudentData();
   }, [studentId]);
 
@@ -186,14 +202,7 @@ export default function StudentProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-600">Chargement du profil...</p>
-        </div>
-      </div>
-    );
+    return <ProfileLoading />;
   }
 
   if (!student) {
@@ -526,5 +535,14 @@ export default function StudentProfilePage() {
         }}
       />
     </div>
+  );
+}
+
+// Default export with Suspense wrapper
+export default function StudentProfilePage() {
+  return (
+    <Suspense fallback={<ProfileLoading />}>
+      <StudentProfileContent />
+    </Suspense>
   );
 }
