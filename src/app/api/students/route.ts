@@ -68,6 +68,67 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    // If ID is provided, fetch single student
+    if (id) {
+      const result = await db.query<Student>(
+        `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
+         FROM students s 
+         LEFT JOIN groups g ON s.groupId = g.id 
+         LEFT JOIN parents p ON s.parentId = p.id 
+         WHERE s.id = ? AND s.organizationId = ?`,
+        [id, user.organizationId]
+      );
+
+      if (result.length === 0) {
+        return NextResponse.json(
+          { error: 'Étudiant non trouvé', message: 'L\'étudiant demandé n\'existe pas ou vous n\'avez pas les droits d\'accès.' },
+          { status: 404 }
+        );
+      }
+
+      const row = result[0];
+      const student = {
+        id: row.id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        fullName: row.fullName,
+        email: row.email,
+        phone: row.phone,
+        dateOfBirth: row.dateOfBirth,
+        gender: row.gender,
+        address: row.address,
+        studentId: row.studentId,
+        program: row.program,
+        groupId: row.groupId,
+        parentId: row.parentId,
+        enrollmentDate: row.enrollmentDate,
+        status: row.status,
+        currentYear: row.currentYear || 1,
+        notes: row.notes,
+        disciplineNotes: row.disciplineNotes,
+        incidentNotes: row.incidentNotes,
+        performanceNotes: row.performanceNotes,
+        absences: row.absences ? JSON.parse(row.absences) : [],
+        retards: row.retards ? JSON.parse(row.retards) : [],
+        avertissements: row.avertissements || 0,
+        miseAPied: row.miseAPied || 0,
+        parent1Name: row.parent1Name || null,
+        parent1Phone: row.parent1Phone || null,
+        parent1Whatsapp: row.parent1Whatsapp || 0,
+        parent2Name: row.parent2Name || null,
+        parent2Phone: row.parent2Phone || null,
+        parent2Whatsapp: row.parent2Whatsapp || 0,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        group: row.groupId ? { id: row.groupId, name: row.groupName } : null,
+        parent: row.parentId ? { id: row.parentId, fullName: row.parentName, phone: row.parentPhone } : null,
+      };
+
+      return NextResponse.json({ student });
+    }
+
     const status = searchParams.get('status');
     const groupId = searchParams.get('groupId');
     const search = searchParams.get('search');
