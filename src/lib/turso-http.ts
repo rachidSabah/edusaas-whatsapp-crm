@@ -220,3 +220,40 @@ export async function tursoQuery<T = Record<string, unknown>>(
   const result = await tursoExecute(url, authToken, sql, args);
   return parseTursoResult<T>(result);
 }
+
+/**
+ * Execute a write operation with verification (for Turso replication delay)
+ * This waits after INSERT/UPDATE and verifies the data exists
+ */
+export async function tursoExecuteWithVerify<T = Record<string, unknown>>(
+  url: string,
+  authToken: string,
+  sql: string,
+  args: unknown[] = [],
+  verifySql?: string,
+  verifyArgs?: unknown[],
+  maxRetries: number = 3
+): Promise<{ success: boolean; data?: T[] }> {
+  // Execute the write operation
+  await tursoExecute(url, authToken, sql, args);
+  
+  // If no verify SQL provided, just return success
+  if (!verifySql) {
+    return { success: true };
+  }
+  
+  // Wait for replication
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Verify with retries
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const result = await tursoQuery<T>(url, authToken, verifySql, verifyArgs || []);
+    if (result.length > 0) {
+      return { success: true, data: result };
+    }
+    // Wait longer between retries
+    await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+  }
+  
+  return { success: false };
+}

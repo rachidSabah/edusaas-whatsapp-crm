@@ -112,10 +112,11 @@ export async function POST(request: NextRequest) {
 
     const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Group>(
       `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity, 
        year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         user.organizationId,
@@ -130,25 +131,19 @@ export async function POST(request: NextRequest) {
         year2StartDate || null,
         year2EndDate || null,
         currentYear || 1,
-      ]
-    );
-
-    // Small delay to allow Turso replication to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Fetch the created group
-    const result = await db.query<Group>(
+      ],
       `SELECT g.*, u.name as teacherName
-            FROM groups g
-            LEFT JOIN users u ON g.teacherId = u.id
-            WHERE g.id = ?`,
+       FROM groups g
+       LEFT JOIN users u ON g.teacherId = u.id
+       WHERE g.id = ?`,
       [id]
     );
 
-    // If group not found immediately, retry after a short delay
-    let group = result[0];
+    // If verification failed, try one more explicit fetch
+    let group = createResult.data?.[0];
     if (!group) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      console.warn('[Create group] Verification failed, retrying fetch...');
+      await new Promise(resolve => setTimeout(resolve, 300));
       const retryResult = await db.query<Group>(
         `SELECT g.*, u.name as teacherName
          FROM groups g

@@ -77,17 +77,25 @@ export async function POST(request: NextRequest) {
 
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Course>(
       `INSERT INTO courses (id, organizationId, name, code, description, duration, fee, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0]
+      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0],
+      `SELECT * FROM courses WHERE id = ?`,
+      [id]
     );
 
-    // Small delay for Turso replication
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // If verification failed, try one more fetch
+    let course = createResult.data?.[0];
+    if (!course) {
+      console.warn('[Create course] Verification failed, retrying fetch...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const retryResult = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
+      course = retryResult[0];
+    }
 
-    const courses = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
-    return NextResponse.json({ course: courses[0] });
+    return NextResponse.json({ course });
   } catch (error) {
     console.error('Create course error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

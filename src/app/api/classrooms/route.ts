@@ -79,17 +79,25 @@ export async function POST(request: NextRequest) {
 
     const id = `classroom_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Classroom>(
       `INSERT INTO classrooms (id, organizationId, name, code, capacity, building, floor, facilities, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null]
+      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null],
+      `SELECT * FROM classrooms WHERE id = ?`,
+      [id]
     );
 
-    // Small delay for Turso replication
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // If verification failed, try one more fetch
+    let classroom = createResult.data?.[0];
+    if (!classroom) {
+      console.warn('[Create classroom] Verification failed, retrying fetch...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const retryResult = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
+      classroom = retryResult[0];
+    }
 
-    const classrooms = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
-    return NextResponse.json({ classroom: classrooms[0] });
+    return NextResponse.json({ classroom });
   } catch (error) {
     console.error('Create classroom error:', error);
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });

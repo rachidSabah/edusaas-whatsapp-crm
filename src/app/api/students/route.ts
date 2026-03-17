@@ -314,7 +314,8 @@ export async function POST(request: NextRequest) {
     const id = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const studentIdVal = customStudentId || `STD${Date.now()}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Student>(
       `INSERT INTO students (id, organizationId, firstName, lastName, fullName, email, phone, dateOfBirth, gender, address, 
        studentId, program, groupId, parentId, enrollmentDate, status, currentYear, notes, disciplineNotes, incidentNotes, 
        performanceNotes, absences, retards, avertissements, miseAPied, 
@@ -349,14 +350,7 @@ export async function POST(request: NextRequest) {
         parent2Name || null,
         parent2Phone || null,
         parent2Whatsapp ? 1 : 0,
-      ]
-    );
-
-    // Small delay for Turso replication
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Fetch the created student
-    const result = await db.query<Student>(
+      ],
       `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
        FROM students s 
        LEFT JOIN groups g ON s.groupId = g.id 
@@ -365,7 +359,22 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    const row = result[0];
+    // If verification failed, try one more fetch
+    let row = createResult.data?.[0];
+    if (!row) {
+      console.warn('[Create student] Verification failed, retrying fetch...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const retryResult = await db.query<Student>(
+        `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
+         FROM students s 
+         LEFT JOIN groups g ON s.groupId = g.id 
+         LEFT JOIN parents p ON s.parentId = p.id 
+         WHERE s.id = ?`,
+        [id]
+      );
+      row = retryResult[0];
+    }
+
     const student = row ? {
       ...row,
       currentYear: row.currentYear || 1,

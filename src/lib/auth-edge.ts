@@ -58,6 +58,43 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
 }
 
 /**
+ * Auto-setup organization for SUPER_ADMIN without organization
+ */
+async function autoSetupSuperAdmin(
+  dbUrl: string, 
+  dbToken: string, 
+  userId: string, 
+  email: string
+): Promise<string> {
+  console.log(`[autoSetupSuperAdmin] Setting up organization for SUPER_ADMIN: ${userId}`);
+  
+  const orgId = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const now = new Date().toISOString();
+  
+  // Import tursoExecute for write operations
+  const { tursoExecute: execute } = await import('./turso-http');
+  
+  // Create organization
+  await execute(dbUrl, dbToken,
+    `INSERT INTO organizations (id, name, slug, email, plan, isActive, aiEnabled, aiDailyLimit, aiDailyUsed, whatsappConnected, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, 'enterprise', 1, 1, 1000, 0, 0, ?, ?)`,
+    [orgId, 'EduSaaS Admin Organization', 'edusaas-admin', email, now, now]
+  );
+  
+  // Wait for replication
+  await new Promise(resolve => setTimeout(resolve, 150));
+  
+  // Update user with organizationId
+  await execute(dbUrl, dbToken,
+    `UPDATE users SET organizationId = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+    [orgId, userId]
+  );
+  
+  console.log(`[autoSetupSuperAdmin] Created organization ${orgId} for user ${userId}`);
+  return orgId;
+}
+
+/**
  * Get current authenticated user
  * This function must be called within a request context
  */
@@ -99,6 +136,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const user = users[0];
     if (!user || user.isActive !== 1) {
       return null;
+    }
+
+    // Auto-setup for SUPER_ADMIN without organization
+    if (user.role === 'SUPER_ADMIN' && !user.organizationId) {
+      console.log(`[getCurrentUser] SUPER_ADMIN without organization, auto-setting up...`);
+      const orgId = await autoSetupSuperAdmin(dbUrl, dbToken, user.id, user.email);
+      user.organizationId = orgId;
     }
 
     return {
