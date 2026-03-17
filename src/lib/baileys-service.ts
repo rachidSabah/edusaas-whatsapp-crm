@@ -1,9 +1,9 @@
-import { getDbContext } from './db-context';
-
 /**
  * Baileys Session Service
  * Manages WhatsApp connections via Baileys with Turso persistence
  */
+
+import { getDbContext } from './db-context';
 
 interface BaileysSession {
   id: string;
@@ -17,7 +17,12 @@ interface BaileysSession {
 }
 
 export class BaileysSessionService {
-  private static db = getDbContext();
+  /**
+   * Get database context lazily (only when needed)
+   */
+  private static getDb() {
+    return getDbContext();
+  }
 
   /**
    * Create or update a session
@@ -27,6 +32,7 @@ export class BaileysSessionService {
     sessionData: string,
     qrCode?: string
   ): Promise<BaileysSession> {
+    const db = this.getDb();
     const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
     const now = new Date().toISOString();
 
@@ -35,7 +41,7 @@ export class BaileysSessionService {
 
       if (existing) {
         // Update existing session
-        await this.db.execute(
+        await db.execute(
           `UPDATE baileys_sessions 
            SET sessionData = ?, qrCode = ?, status = ?, updatedAt = ?
            WHERE id = ?`,
@@ -43,7 +49,7 @@ export class BaileysSessionService {
         );
       } else {
         // Create new session
-        await this.db.execute(
+        await db.execute(
           `INSERT INTO baileys_sessions 
            (id, phoneNumber, sessionData, qrCode, status, createdAt, updatedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -62,8 +68,10 @@ export class BaileysSessionService {
    * Get a session by phone number
    */
   static async getSession(phoneNumber: string): Promise<BaileysSession | null> {
+    const db = this.getDb();
+    
     try {
-      const result = await this.db.query<BaileysSession>(
+      const result = await db.query<BaileysSession>(
         `SELECT * FROM baileys_sessions WHERE phoneNumber = ?`,
         [phoneNumber]
       );
@@ -73,7 +81,7 @@ export class BaileysSessionService {
         
         // If QR code is missing in baileys_sessions, try to get it from organizations
         if (!session.qrCode) {
-          const orgResult = await this.db.query<{ whatsappQRCode: string }>(
+          const orgResult = await db.query<{ whatsappQRCode: string }>(
             `SELECT whatsappQRCode FROM organizations WHERE id = ?`,
             [phoneNumber]
           );
@@ -86,7 +94,7 @@ export class BaileysSessionService {
       }
 
       // If no session in baileys_sessions, check if we have a QR code in organizations
-      const orgResult = await this.db.query<{ whatsappQRCode: string }>(
+      const orgResult = await db.query<{ whatsappQRCode: string }>(
         `SELECT whatsappQRCode FROM organizations WHERE id = ?`,
         [phoneNumber]
       );
@@ -115,8 +123,10 @@ export class BaileysSessionService {
    * Get all active sessions
    */
   static async getAllSessions(): Promise<BaileysSession[]> {
+    const db = this.getDb();
+    
     try {
-      const result = await this.db.query<BaileysSession>(
+      const result = await db.query<BaileysSession>(
         `SELECT * FROM baileys_sessions WHERE status = 'connected' ORDER BY lastActivity DESC`
       );
       return result;
@@ -130,9 +140,11 @@ export class BaileysSessionService {
    * Update QR code for a session
    */
   static async updateQRCode(phoneNumber: string, qrCode: string): Promise<void> {
+    const db = this.getDb();
+    
     try {
       const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
-      await this.db.execute(
+      await db.execute(
         `UPDATE baileys_sessions SET qrCode = ?, updatedAt = ? WHERE id = ?`,
         [qrCode, new Date().toISOString(), id]
       );
@@ -149,9 +161,11 @@ export class BaileysSessionService {
     phoneNumber: string,
     status: 'connected' | 'disconnected' | 'connecting'
   ): Promise<void> {
+    const db = this.getDb();
+    
     try {
       const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
-      await this.db.execute(
+      await db.execute(
         `UPDATE baileys_sessions SET status = ?, updatedAt = ? WHERE id = ?`,
         [status, new Date().toISOString(), id]
       );
@@ -165,9 +179,11 @@ export class BaileysSessionService {
    * Update last activity timestamp
    */
   static async updateLastActivity(phoneNumber: string): Promise<void> {
+    const db = this.getDb();
+    
     try {
       const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
-      await this.db.execute(
+      await db.execute(
         `UPDATE baileys_sessions SET lastActivity = ? WHERE id = ?`,
         [new Date().toISOString(), id]
       );
@@ -180,9 +196,11 @@ export class BaileysSessionService {
    * Delete a session
    */
   static async deleteSession(phoneNumber: string): Promise<void> {
+    const db = this.getDb();
+    
     try {
       const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
-      await this.db.execute(
+      await db.execute(
         `DELETE FROM baileys_sessions WHERE id = ?`,
         [id]
       );
@@ -196,9 +214,11 @@ export class BaileysSessionService {
    * Disconnect a session (mark as disconnected)
    */
   static async disconnectSession(phoneNumber: string): Promise<void> {
+    const db = this.getDb();
+    
     try {
       const id = `baileys_${phoneNumber.replace(/\D/g, '')}`;
-      await this.db.execute(
+      await db.execute(
         `UPDATE baileys_sessions SET status = 'disconnected', updatedAt = ? WHERE id = ?`,
         [new Date().toISOString(), id]
       );
