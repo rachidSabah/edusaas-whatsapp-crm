@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
       [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0]
     );
 
+    // Small delay for Turso replication
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const courses = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
     return NextResponse.json({ course: courses[0] });
   } catch (error) {

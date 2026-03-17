@@ -352,6 +352,9 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    // Small delay for Turso replication
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Fetch the created student
     const result = await db.query<Student>(
       `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 

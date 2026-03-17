@@ -133,6 +133,9 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    // Small delay to allow Turso replication to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Fetch the created group
     const result = await db.query<Group>(
       `SELECT g.*, u.name as teacherName
@@ -142,7 +145,19 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    const group = result[0];
+    // If group not found immediately, retry after a short delay
+    let group = result[0];
+    if (!group) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const retryResult = await db.query<Group>(
+        `SELECT g.*, u.name as teacherName
+         FROM groups g
+         LEFT JOIN users u ON g.teacherId = u.id
+         WHERE g.id = ?`,
+        [id]
+      );
+      group = retryResult[0];
+    }
 
     return NextResponse.json({ group });
   } catch (error) {
