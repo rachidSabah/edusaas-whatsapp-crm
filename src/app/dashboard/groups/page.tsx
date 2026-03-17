@@ -67,7 +67,11 @@ export default function GroupsPage() {
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch('/api/groups');
+      const response = await fetch('/api/groups', {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       const data = await response.json();
       setGroups(data.groups || []);
     } catch (error) {

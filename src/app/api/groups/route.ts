@@ -52,7 +52,13 @@ export async function GET(request: NextRequest) {
       teacher: row.teacherId ? { id: row.teacherId, name: row.teacherName } : null,
     }));
 
-    return NextResponse.json({ groups });
+    return NextResponse.json({ groups }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get groups error:', error);
     return NextResponse.json(

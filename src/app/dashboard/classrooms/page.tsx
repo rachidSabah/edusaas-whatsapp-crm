@@ -50,7 +50,11 @@ export default function ClassroomsPage() {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
 
-      const response = await fetch(`/api/classrooms?${params}`);
+      const response = await fetch(`/api/classrooms?${params}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       const data = await response.json();
       setClassrooms(data.classrooms || []);
     } catch (error) {

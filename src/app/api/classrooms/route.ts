@@ -43,7 +43,13 @@ export async function GET(request: NextRequest) {
     sql += ` ORDER BY name ASC`;
 
     const classrooms = await db.query<Classroom>(sql, args);
-    return NextResponse.json({ classrooms });
+    return NextResponse.json({ classrooms }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get classrooms error:', error);
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });

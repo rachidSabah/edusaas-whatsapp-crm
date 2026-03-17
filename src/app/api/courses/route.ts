@@ -41,7 +41,13 @@ export async function GET(request: NextRequest) {
     sql += ` ORDER BY createdAt DESC`;
 
     const courses = await db.query<Course>(sql, args);
-    return NextResponse.json({ courses });
+    return NextResponse.json({ courses }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get courses error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

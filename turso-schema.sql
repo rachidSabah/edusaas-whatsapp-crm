@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   whatsappSessionId TEXT,
   whatsappConnected INTEGER DEFAULT 0,
   whatsappPhone TEXT,
+  whatsappQRCode TEXT,
   aiEnabled INTEGER DEFAULT 1,
   aiDailyLimit INTEGER DEFAULT 1000,
   aiDailyUsed INTEGER DEFAULT 0,
@@ -562,6 +563,21 @@ CREATE TABLE IF NOT EXISTS whatsapp_accounts (
 );
 
 CREATE INDEX idx_whatsapp_accounts_org ON whatsapp_accounts(organizationId);
+
+-- Baileys Sessions Table for WhatsApp Web connections
+CREATE TABLE IF NOT EXISTS baileys_sessions (
+  id TEXT PRIMARY KEY,
+  phoneNumber TEXT NOT NULL UNIQUE,
+  sessionData TEXT NOT NULL DEFAULT '{}',
+  qrCode TEXT,
+  status TEXT DEFAULT 'disconnected',
+  lastActivity TEXT DEFAULT CURRENT_TIMESTAMP,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_baileys_sessions_status ON baileys_sessions(status);
+CREATE INDEX idx_baileys_sessions_phone ON baileys_sessions(phoneNumber);
 
 -- WhatsApp Notification Log Table for tracking all sent messages
 CREATE TABLE IF NOT EXISTS whatsapp_notifications (

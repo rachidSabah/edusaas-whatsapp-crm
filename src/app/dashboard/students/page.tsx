@@ -105,14 +105,23 @@ export default function StudentsPage() {
       if (search) params.append('search', search);
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
 
-      const response = await fetch(`/api/students?${params}`);
+      const response = await fetch(`/api/students?${params}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch students');
       }
       const data = await response.json();
       setStudents(data.students || []);
-      setError(null);
+      // Show message if provided by API
+      if (data.message && data.students?.length === 0) {
+        setError(data.message);
+      } else {
+        setError(null);
+      }
     } catch (error: any) {
       console.error('Error fetching students:', error);
       setError(error.message);

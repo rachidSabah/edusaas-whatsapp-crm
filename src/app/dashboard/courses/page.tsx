@@ -49,7 +49,11 @@ export default function CoursesPage() {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
 
-      const response = await fetch(`/api/courses?${params}`);
+      const response = await fetch(`/api/courses?${params}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       const data = await response.json();
       setCourses(data.courses || []);
     } catch (error) {
