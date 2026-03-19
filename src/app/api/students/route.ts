@@ -64,6 +64,38 @@ export async function GET(request: NextRequest) {
           totalPages: 0,
         },
         message: 'Aucune organisation associée. Veuillez contacter l\'administrateur pour rejoindre une organisation.',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Students API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({
+        students: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+        },
+        message: 'Organisation non trouvée. Veuillez contacter l\'administrateur.',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 

@@ -24,7 +24,36 @@ export async function GET(request: NextRequest) {
     const db = getDbContext();
 
     if (!user.organizationId) {
-      return NextResponse.json({ courses: [] });
+      return NextResponse.json({ 
+        courses: [],
+        message: 'Aucune organisation associée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Courses API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({ 
+        courses: [],
+        message: 'Organisation non trouvée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
     const { searchParams } = new URL(request.url);
