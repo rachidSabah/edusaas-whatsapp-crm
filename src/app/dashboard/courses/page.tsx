@@ -91,7 +91,7 @@ export default function CoursesPage() {
 
       const responseData = await response.json();
 
-      if (response.ok) {
+      if (response.ok && responseData.success !== false) {
         setDialogOpen(false);
         setEditingCourse(null);
         setFormData({ name: '', code: '', description: '', duration: '', fee: '' });
@@ -106,10 +106,14 @@ export default function CoursesPage() {
         } else if (responseData.course) {
           // Add new course to local state immediately
           setCourses(prev => [responseData.course, ...prev]);
+          console.log('[Courses] Added new course to UI:', responseData.course.name);
         }
         
         // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => fetchCourses(), 2000);
+        setTimeout(() => {
+          console.log('[Courses] Re-fetching courses after creation...');
+          fetchCourses();
+        }, 2500);
       } else {
         alert(responseData.error || 'Erreur lors de la sauvegarde');
       }

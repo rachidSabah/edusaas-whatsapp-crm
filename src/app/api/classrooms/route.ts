@@ -123,16 +123,31 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    // If verification failed, try one more fetch
+    // If verification failed, try more explicit fetches with increasing delays
     let classroom = createResult.data?.[0];
-    if (!classroom) {
-      console.warn('[Create classroom] Verification failed, retrying fetch...');
-      await new Promise(resolve => setTimeout(resolve, 300));
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!classroom && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create classroom] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
       const retryResult = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
       classroom = retryResult[0];
     }
 
-    return NextResponse.json({ classroom });
+    if (!classroom) {
+      console.error(`[Create classroom] Failed to verify classroom ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Classroom created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create classroom] Successfully created and verified classroom: ${classroom.name} (${classroom.id})`);
+    return NextResponse.json({ success: true, classroom });
   } catch (error) {
     console.error('Create classroom error:', error);
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });

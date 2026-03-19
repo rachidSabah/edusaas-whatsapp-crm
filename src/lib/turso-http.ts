@@ -232,7 +232,7 @@ export async function tursoExecuteWithVerify<T = Record<string, unknown>>(
   args: unknown[] = [],
   verifySql?: string,
   verifyArgs?: unknown[],
-  maxRetries: number = 3
+  maxRetries: number = 5
 ): Promise<{ success: boolean; data?: T[] }> {
   // Execute the write operation
   await tursoExecute(url, authToken, sql, args);
@@ -242,18 +242,22 @@ export async function tursoExecuteWithVerify<T = Record<string, unknown>>(
     return { success: true };
   }
   
-  // Wait for replication
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Wait for replication (increased from 100ms to 300ms)
+  await new Promise(resolve => setTimeout(resolve, 300));
   
-  // Verify with retries
+  // Verify with retries (increased delays)
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const result = await tursoQuery<T>(url, authToken, verifySql, verifyArgs || []);
     if (result.length > 0) {
+      console.log(`[tursoExecuteWithVerify] Data verified after ${attempt + 1} attempt(s)`);
       return { success: true, data: result };
     }
-    // Wait longer between retries
-    await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+    // Wait longer between retries (exponential backoff: 200ms, 400ms, 600ms, 800ms, 1000ms)
+    const delay = 200 * (attempt + 1);
+    console.log(`[tursoExecuteWithVerify] Verification attempt ${attempt + 1} failed, waiting ${delay}ms...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
   
+  console.warn(`[tursoExecuteWithVerify] Verification failed after ${maxRetries} attempts`);
   return { success: false };
 }

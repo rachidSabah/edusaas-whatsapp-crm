@@ -107,7 +107,7 @@ export default function GroupsPage() {
 
       const responseData = await response.json();
 
-      if (response.ok) {
+      if (response.ok && responseData.success !== false) {
         setDialogOpen(false);
         setEditingGroup(null);
         setFormData({
@@ -136,10 +136,14 @@ export default function GroupsPage() {
             studentCount: 0
           };
           setGroups(prev => [newGroup, ...prev]);
+          console.log('[Groups] Added new group to UI:', newGroup.name);
         }
         
         // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => fetchGroups(), 2000);
+        setTimeout(() => {
+          console.log('[Groups] Re-fetching groups after creation...');
+          fetchGroups();
+        }, 2500);
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');

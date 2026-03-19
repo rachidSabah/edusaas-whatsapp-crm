@@ -121,16 +121,31 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    // If verification failed, try one more fetch
+    // If verification failed, try more explicit fetches with increasing delays
     let course = createResult.data?.[0];
-    if (!course) {
-      console.warn('[Create course] Verification failed, retrying fetch...');
-      await new Promise(resolve => setTimeout(resolve, 300));
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!course && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create course] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
       const retryResult = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
       course = retryResult[0];
     }
 
-    return NextResponse.json({ course });
+    if (!course) {
+      console.error(`[Create course] Failed to verify course ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Course created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create course] Successfully created and verified course: ${course.name} (${course.id})`);
+    return NextResponse.json({ success: true, course });
   } catch (error) {
     console.error('Create course error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -86,7 +86,7 @@ export default function ClassroomsPage() {
 
       const responseData = await response.json();
 
-      if (response.ok) {
+      if (response.ok && responseData.success !== false) {
         setDialogOpen(false);
         setEditingClassroom(null);
         setFormData({ name: '', code: '', capacity: '', building: '', floor: '', facilities: '' });
@@ -101,10 +101,14 @@ export default function ClassroomsPage() {
         } else if (responseData.classroom) {
           // Add new classroom to local state immediately
           setClassrooms(prev => [responseData.classroom, ...prev]);
+          console.log('[Classrooms] Added new classroom to UI:', responseData.classroom.name);
         }
         
         // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => fetchClassrooms(), 2000);
+        setTimeout(() => {
+          console.log('[Classrooms] Re-fetching classrooms after creation...');
+          fetchClassrooms();
+        }, 2500);
       } else {
         alert(responseData.error || 'Erreur lors de la sauvegarde');
       }

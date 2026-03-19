@@ -174,11 +174,17 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    // If verification failed, try one more explicit fetch
+    // If verification failed, try more explicit fetches with increasing delays
     let group = createResult.data?.[0];
-    if (!group) {
-      console.warn('[Create group] Verification failed, retrying fetch...');
-      await new Promise(resolve => setTimeout(resolve, 300));
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!group && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create group] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
       const retryResult = await db.query<Group>(
         `SELECT g.*, u.name as teacherName
          FROM groups g
@@ -189,7 +195,16 @@ export async function POST(request: NextRequest) {
       group = retryResult[0];
     }
 
-    return NextResponse.json({ group });
+    if (!group) {
+      console.error(`[Create group] Failed to verify group ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Group created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create group] Successfully created and verified group: ${group.name} (${group.id})`);
+    return NextResponse.json({ success: true, group });
   } catch (error) {
     console.error('Create group error:', error);
     return NextResponse.json(
