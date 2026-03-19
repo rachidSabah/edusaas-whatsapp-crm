@@ -89,16 +89,29 @@ export default function CoursesPage() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
         setDialogOpen(false);
         setEditingCourse(null);
         setFormData({ name: '', code: '', description: '', duration: '', fee: '' });
-        // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchCourses();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingCourse) {
+          // Update existing course in local state
+          setCourses(prev => prev.map(c => c.id === editingCourse.id 
+            ? { ...c, ...responseData.course } 
+            : c
+          ));
+        } else if (responseData.course) {
+          // Add new course to local state immediately
+          setCourses(prev => [responseData.course, ...prev]);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => fetchCourses(), 2000);
       } else {
-        const data = await response.json();
-        alert(data.error || 'Erreur lors de la sauvegarde');
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving course:', error);

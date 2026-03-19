@@ -121,9 +121,25 @@ export default function GroupsPage() {
           year2EndDate: '',
           currentYear: '1',
         });
-        // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchGroups();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingGroup) {
+          // Update existing group in local state
+          setGroups(prev => prev.map(g => g.id === editingGroup.id 
+            ? { ...g, ...responseData.group, studentCount: g.studentCount || 0 } 
+            : g
+          ));
+        } else if (responseData.group) {
+          // Add new group to local state immediately
+          const newGroup: Group = {
+            ...responseData.group,
+            studentCount: 0
+          };
+          setGroups(prev => [newGroup, ...prev]);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => fetchGroups(), 2000);
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');

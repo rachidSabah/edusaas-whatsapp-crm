@@ -163,6 +163,8 @@ export default function StudentsPage() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
         setDialogOpen(false);
         setEditingStudent(null);
@@ -182,13 +184,27 @@ export default function StudentsPage() {
           parent2Phone: '',
           parent2Whatsapp: false,
         });
-        fetchStudents();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingStudent) {
+          // Update existing student in local state
+          setStudents(prev => prev.map(s => s.id === editingStudent.id 
+            ? { ...s, ...responseData.student } 
+            : s
+          ));
+        } else if (responseData.student) {
+          // Add new student to local state immediately
+          setStudents(prev => [responseData.student, ...prev]);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => fetchStudents(), 2000);
       } else {
-        const data = await response.json();
-        alert(data.error || 'Failed to save student');
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving student:', error);
+      alert('Erreur de connexion au serveur');
     }
   };
 

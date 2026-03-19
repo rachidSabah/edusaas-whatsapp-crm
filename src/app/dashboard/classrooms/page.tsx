@@ -84,16 +84,29 @@ export default function ClassroomsPage() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
         setDialogOpen(false);
         setEditingClassroom(null);
         setFormData({ name: '', code: '', capacity: '', building: '', floor: '', facilities: '' });
-        // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchClassrooms();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingClassroom) {
+          // Update existing classroom in local state
+          setClassrooms(prev => prev.map(c => c.id === editingClassroom.id 
+            ? { ...c, ...responseData.classroom } 
+            : c
+          ));
+        } else if (responseData.classroom) {
+          // Add new classroom to local state immediately
+          setClassrooms(prev => [responseData.classroom, ...prev]);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => fetchClassrooms(), 2000);
       } else {
-        const data = await response.json();
-        alert(data.error || 'Erreur lors de la sauvegarde');
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving classroom:', error);

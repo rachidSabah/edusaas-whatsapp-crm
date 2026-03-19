@@ -41,7 +41,8 @@ interface Student {
   lastName: string;
   email: string;
   phone: string;
-  group: string;
+  group: { id: string; name: string } | null;
+  groupName?: string;
   program: string;
   status: string;
   enrollmentDate: string;
@@ -91,28 +92,71 @@ function StudentProfileContent() {
     fetchStudentData();
   }, [studentId]);
 
+  // Handle missing studentId
+  if (!studentId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+            <p className="text-slate-600 mb-4">ID étudiant manquant</p>
+            <Link href="/dashboard/students">
+              <Button variant="outline">Retour à la liste</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const fetchStudentData = async () => {
     try {
       setLoading(true);
 
       // Fetch student details
-      const studentRes = await fetch(`/api/students?id=${studentId}`);
+      const studentRes = await fetch(`/api/students?id=${studentId}`, {
+        headers: { 'Cache-Control': 'no-store' }
+      });
       const studentData = await studentRes.json();
-      setStudent(studentData.student);
+      
+      if (!studentRes.ok) {
+        console.error('Error fetching student:', studentData.error);
+        setStudent(null);
+        return;
+      }
+      
+      setStudent(studentData.student || null);
 
       // Fetch student logs
-      const logsRes = await fetch(`/api/student-logs?studentId=${studentId}`);
-      const logsData = await logsRes.json();
-      setLogs(logsData.logs || []);
+      try {
+        const logsRes = await fetch(`/api/student-logs?studentId=${studentId}`, {
+          headers: { 'Cache-Control': 'no-store' }
+        });
+        const logsData = await logsRes.json();
+        setLogs(logsData.logs || []);
+      } catch (logsError) {
+        console.error('Error fetching logs:', logsError);
+        setLogs([]);
+      }
 
       // Fetch attendance records
-      const attendanceRes = await fetch(`/api/attendance?studentId=${studentId}`);
-      if (attendanceRes.ok) {
-        const attendanceData = await attendanceRes.json();
-        setAttendance(attendanceData.records || []);
+      try {
+        const attendanceRes = await fetch(`/api/attendance?studentId=${studentId}`, {
+          headers: { 'Cache-Control': 'no-store' }
+        });
+        if (attendanceRes.ok) {
+          const attendanceData = await attendanceRes.json();
+          setAttendance(attendanceData.records || []);
+        } else {
+          setAttendance([]);
+        }
+      } catch (attError) {
+        console.error('Error fetching attendance:', attError);
+        setAttendance([]);
       }
     } catch (error) {
       console.error('Error fetching student data:', error);
+      setStudent(null);
     } finally {
       setLoading(false);
     }
@@ -236,7 +280,9 @@ function StudentProfileContent() {
             <h1 className="text-3xl font-bold text-slate-900">
               {student.firstName} {student.lastName}
             </h1>
-            <p className="text-slate-600">{student.group} • {student.program}</p>
+            <p className="text-slate-600">
+              {student.group?.name || student.groupName || 'Aucun groupe'} • {student.program || 'N/A'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -288,7 +334,9 @@ function StudentProfileContent() {
             <div>
               <p className="text-sm text-slate-600">Date d'inscription</p>
               <p className="font-medium">
-                {new Date(student.enrollmentDate).toLocaleDateString('fr-FR')}
+                {student.enrollmentDate 
+                  ? new Date(student.enrollmentDate).toLocaleDateString('fr-FR') 
+                  : 'N/A'}
               </p>
             </div>
           </div>
