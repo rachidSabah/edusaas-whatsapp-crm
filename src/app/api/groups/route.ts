@@ -190,8 +190,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, group });
   } catch (error) {
     console.error('Create group error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    const errorMsg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Internal server error', details: String(error) },
+      { error: `DEBUG SQL ERROR: ${errorMsg}`, details: String(error) },
       { status: 500 }
     );
   }
