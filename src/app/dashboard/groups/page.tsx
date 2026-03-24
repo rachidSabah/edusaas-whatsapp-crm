@@ -122,8 +122,20 @@ export default function GroupsPage() {
           currentYear: '1',
         });
         
-        // Re-fetch immediately — the API already waits for Turso verification before responding
-        fetchGroups();
+        // Use the group returned by the API (always present now, synthetic if replica lagged)
+        // to update state immediately — do NOT re-fetch right away as the replica may still be stale
+        const rd = responseData as any;
+        if (editingGroup) {
+          setGroups(prev => prev.map(g => g.id === editingGroup.id
+            ? { ...g, ...(rd.group || {}), studentCount: g.studentCount || 0 }
+            : g
+          ));
+        } else if (rd.group) {
+          const newGroup: Group = { ...rd.group, studentCount: 0 };
+          setGroups(prev => [newGroup, ...prev]);
+        }
+        // After 5s the replica should have synced — refresh quietly in the background
+        setTimeout(() => fetchGroups(), 5000);
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');
