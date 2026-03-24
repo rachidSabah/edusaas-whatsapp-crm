@@ -109,11 +109,7 @@ export default function CoursesPage() {
           console.log('[Courses] Added new course to UI:', responseData.course.name);
         }
         
-        // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => {
-          console.log('[Courses] Re-fetching courses after creation...');
-          fetchCourses();
-        }, 2500);
+        // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
       } else {
         alert(responseData.error || 'Erreur lors de la sauvegarde');
       }

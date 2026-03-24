@@ -198,8 +198,7 @@ export default function StudentsPage() {
           setStudents(prev => [responseData.student, ...prev]);
         }
         
-        // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => fetchStudents(), 2000);
+        // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
       } else {
         alert(responseData.error || 'Erreur lors de la sauvegarde');
       }

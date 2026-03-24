@@ -139,11 +139,7 @@ export default function GroupsPage() {
           console.log('[Groups] Added new group to UI:', newGroup.name);
         }
         
-        // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => {
-          console.log('[Groups] Re-fetching groups after creation...');
-          fetchGroups();
-        }, 2500);
+        // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');

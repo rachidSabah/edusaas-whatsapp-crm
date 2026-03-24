@@ -104,11 +104,7 @@ export default function ClassroomsPage() {
           console.log('[Classrooms] Added new classroom to UI:', responseData.classroom.name);
         }
         
-        // Then re-fetch to sync with server (with longer delay for Turso replication)
-        setTimeout(() => {
-          console.log('[Classrooms] Re-fetching classrooms after creation...');
-          fetchClassrooms();
-        }, 2500);
+        // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
       } else {
         alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
