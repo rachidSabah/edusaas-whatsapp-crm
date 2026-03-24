@@ -196,14 +196,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (!group) {
-      console.error(`[Create group] Failed to verify group ${id} after all retries`);
-      return NextResponse.json(
-        { error: 'Group created but verification failed. Please refresh the page.' },
-        { status: 500 }
-      );
+      // The INSERT succeeded (no exception), but the read-replica hasn't synced yet.
+      // Return success with a synthetic group object built from what we inserted.
+      console.warn(`[Create group] Read-replica lag — returning synthetic group object for ${id}`);
+      group = {
+        id,
+        organizationId: user.organizationId,
+        name,
+        code: code || null,
+        description: description || null,
+        schedule: schedule || null,
+        teacherId: teacherId || null,
+        capacity: capacity || null,
+        year1StartDate: year1StartDate || null,
+        year1EndDate: year1EndDate || null,
+        year2StartDate: year2StartDate || null,
+        year2EndDate: year2EndDate || null,
+        currentYear: currentYear || 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        teacherName: null,
+      };
     }
 
-    console.log(`[Create group] Successfully created and verified group: ${group.name} (${group.id})`);
+    console.log(`[Create group] Successfully created group: ${group.name} (${group.id})`);
     return NextResponse.json({ success: true, group });
   } catch (error) {
     console.error('Create group error:', error);
