@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get groups error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json(
       { error: 'Internal server error', details: String(error) },
       { status: 500 }

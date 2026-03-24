@@ -79,6 +79,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get courses error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -137,6 +140,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, course });
   } catch (error) {
     console.error('Create course error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -180,6 +186,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ course: courses[0] });
   } catch (error) {
     console.error('Update course error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -205,6 +214,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: 'Cours supprimé avec succès' });
   } catch (error) {
     console.error('Delete course error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

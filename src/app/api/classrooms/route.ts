@@ -81,6 +81,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get classrooms error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
   }
 }
@@ -140,6 +143,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, classroom });
   } catch (error) {
     console.error('Create classroom error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
   }
 }
@@ -184,6 +190,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ classroom: classrooms[0] });
   } catch (error) {
     console.error('Update classroom error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
   }
 }
@@ -219,6 +228,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: 'Salle supprimée avec succès' });
   } catch (error) {
     console.error('Delete classroom error:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
   }
 }

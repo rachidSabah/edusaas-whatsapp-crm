@@ -279,13 +279,10 @@ export async function GET(request: NextRequest) {
     console.error('Get students error:', error);
     // Check if it's an authentication error
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Non autorisé', message: 'Veuillez vous connecter pour accéder à cette ressource.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     return NextResponse.json(
-      { error: 'Erreur interne du serveur', message: 'Une erreur inattendue s\'est produite. Veuillez réessayer.', details: String(error) },
+      { error: 'Internal server error', message: 'Une erreur inattendue s\'est produite. Veuillez réessayer.', details: String(error) },
       { status: 500 }
     );
   }
@@ -432,10 +429,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Create student error:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Non autorisé', message: 'Veuillez vous connecter pour effectuer cette action.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     return NextResponse.json(
       { error: 'Erreur interne du serveur', message: 'Une erreur inattendue s\'est produite lors de la création de l\'étudiant.', details: String(error) },
@@ -572,10 +566,7 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error('Update student error:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Non autorisé', message: 'Veuillez vous connecter pour effectuer cette action.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     return NextResponse.json(
       { error: 'Erreur interne du serveur', message: 'Une erreur inattendue s\'est produite lors de la mise à jour de l\'étudiant.', details: String(error) },
@@ -626,10 +617,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Delete student error:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Non autorisé', message: 'Veuillez vous connecter pour effectuer cette action.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     return NextResponse.json(
       { error: 'Erreur interne du serveur', message: 'Une erreur inattendue s\'est produite lors de la suppression de l\'étudiant.', details: String(error) },
