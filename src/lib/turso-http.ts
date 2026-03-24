@@ -175,10 +175,18 @@ export async function tursoExecute(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Turso error (${response.status}): ${text}`);
+    throw new Error(`Turso HTTP error (${response.status}): ${text}`);
   }
 
-  return await response.json();
+  const json = await response.json() as TursoResult;
+
+  // Turso returns HTTP 200 even for SQL failures — check the result body for errors
+  const firstResult = json?.results?.[0] as any;
+  if (firstResult?.type === 'error') {
+    throw new Error(`Turso SQL error: ${firstResult.error?.message || JSON.stringify(firstResult.error)}`);
+  }
+
+  return json;
 }
 
 /**

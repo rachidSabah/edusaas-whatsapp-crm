@@ -134,8 +134,8 @@ export default function GroupsPage() {
           const newGroup: Group = { ...rd.group, studentCount: 0 };
           setGroups(prev => [newGroup, ...prev]);
         }
-        // After 5s the replica should have synced — refresh quietly in the background
-        setTimeout(() => fetchGroups(), 5000);
+        // After 15s the replica should have synced — refresh quietly in the background
+        setTimeout(() => fetchGroups(), 15000);
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');
@@ -150,13 +150,20 @@ export default function GroupsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce groupe?')) return;
+    // Optimistically remove from state immediately
+    setGroups(prev => prev.filter(g => g.id !== id));
     try {
       const response = await fetch(`/api/groups?id=${id}`, { method: 'DELETE' });
-      if (response.ok) {
+      if (!response.ok) {
+        // Revert on failure by re-fetching
         fetchGroups();
+      } else {
+        // Sync with DB after 15s to confirm deletion persisted
+        setTimeout(() => fetchGroups(), 15000);
       }
     } catch (error) {
       console.error('Error deleting group:', error);
+      fetchGroups(); // Revert on network error
     }
   };
 
