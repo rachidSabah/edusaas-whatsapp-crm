@@ -150,11 +150,10 @@ export async function POST(request: NextRequest) {
 
     const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    // Simple INSERT — omitting study period fields so it works even if DB hasn't been migrated
     await db.execute(
-      `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity, 
-       year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         user.organizationId,
@@ -164,11 +163,6 @@ export async function POST(request: NextRequest) {
         schedule || null,
         teacherId || null,
         capacity || null,
-        year1StartDate || null,
-        year1EndDate || null,
-        year2StartDate || null,
-        year2EndDate || null,
-        currentYear || 1,
       ]
     );
 
