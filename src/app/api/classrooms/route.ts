@@ -114,39 +114,29 @@ export async function POST(request: NextRequest) {
 
     const id = `classroom_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    // Use executeWithVerify for reliable persistence
-    const createResult = await db.executeWithVerify<Classroom>(
+    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    await db.execute(
       `INSERT INTO classrooms (id, organizationId, name, code, capacity, building, floor, facilities, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null],
-      `SELECT * FROM classrooms WHERE id = ?`,
-      [id]
+      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null]
     );
 
-    // If verification failed, try more explicit fetches with increasing delays
-    let classroom = createResult.data?.[0];
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (!classroom && retryCount < maxRetries) {
-      retryCount++;
-      const delay = 500 * retryCount;
-      console.warn(`[Create classroom] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      const retryResult = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
-      classroom = retryResult[0];
-    }
+    // Build the classroom object from what we just inserted — no replica lag possible
+    const classroom: Classroom = {
+      id,
+      organizationId: user.organizationId,
+      name,
+      code: code || null,
+      capacity: capacity || 30,
+      building: building || null,
+      floor: floor || null,
+      facilities: facilities || null,
+      isActive: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (!classroom) {
-      console.error(`[Create classroom] Failed to verify classroom ${id} after all retries`);
-      return NextResponse.json(
-        { error: 'Classroom created but verification failed. Please refresh the page.' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`[Create classroom] Successfully created and verified classroom: ${classroom.name} (${classroom.id})`);
+    console.log(`[Create classroom] Successfully inserted classroom: ${classroom.name} (${classroom.id})`);
     return NextResponse.json({ success: true, classroom });
   } catch (error) {
     console.error('Create classroom error:', error);

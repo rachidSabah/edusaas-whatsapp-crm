@@ -352,8 +352,8 @@ export async function POST(request: NextRequest) {
     const id = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const studentIdVal = customStudentId || `STD${Date.now()}`;
 
-    // Use executeWithVerify for reliable persistence
-    const createResult = await db.executeWithVerify<Student>(
+    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    await db.execute(
       `INSERT INTO students (id, organizationId, firstName, lastName, fullName, email, phone, dateOfBirth, gender, address, 
        studentId, program, groupId, parentId, enrollmentDate, status, currentYear, notes, disciplineNotes, incidentNotes, 
        performanceNotes, absences, retards, avertissements, miseAPied, 
@@ -380,55 +380,53 @@ export async function POST(request: NextRequest) {
         disciplineNotes || null,
         incidentNotes || null,
         performanceNotes || null,
-        // Parent 1 Information
         parent1Name || null,
         parent1Phone || null,
         parent1Whatsapp ? 1 : 0,
-        // Parent 2 Information
         parent2Name || null,
         parent2Phone || null,
         parent2Whatsapp ? 1 : 0,
-      ],
-      `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
-       FROM students s 
-       LEFT JOIN groups g ON s.groupId = g.id 
-       LEFT JOIN parents p ON s.parentId = p.id 
-       WHERE s.id = ?`,
-      [id]
+      ]
     );
 
-    // If verification failed, try one more fetch
-    let row = createResult.data?.[0];
-    if (!row) {
-      console.warn('[Create student] Verification failed, retrying fetch...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const retryResult = await db.query<Student>(
-        `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
-         FROM students s 
-         LEFT JOIN groups g ON s.groupId = g.id 
-         LEFT JOIN parents p ON s.parentId = p.id 
-         WHERE s.id = ?`,
-        [id]
-      );
-      row = retryResult[0];
-    }
-
-    const student = row ? {
-      ...row,
-      currentYear: row.currentYear || 1,
-      absences: row.absences ? JSON.parse(row.absences) : [],
-      retards: row.retards ? JSON.parse(row.retards) : [],
-      avertissements: row.avertissements || 0,
-      miseAPied: row.miseAPied || 0,
-      parent1Name: row.parent1Name || null,
-      parent1Phone: row.parent1Phone || null,
-      parent1Whatsapp: row.parent1Whatsapp || 0,
-      parent2Name: row.parent2Name || null,
-      parent2Phone: row.parent2Phone || null,
-      parent2Whatsapp: row.parent2Whatsapp || 0,
-      group: row.groupId ? { id: row.groupId, name: row.groupName } : null,
-      parent: row.parentId ? { id: row.parentId, fullName: row.parentName, phone: row.parentPhone } : null,
-    } : null;
+    // Build the student object from what we just inserted — no replica lag possible
+    const student = {
+      id,
+      organizationId: user.organizationId,
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`,
+      email: email || null,
+      phone: phone || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      address: address || null,
+      studentId: studentIdVal,
+      program: program || null,
+      groupId: groupId || null,
+      parentId: parentId || null,
+      enrollmentDate: enrollmentDate || new Date().toISOString(),
+      status: 'ACTIVE',
+      currentYear: currentYear || 1,
+      notes: notes || null,
+      disciplineNotes: disciplineNotes || null,
+      incidentNotes: incidentNotes || null,
+      performanceNotes: performanceNotes || null,
+      absences: [],
+      retards: [],
+      avertissements: 0,
+      miseAPied: 0,
+      parent1Name: parent1Name || null,
+      parent1Phone: parent1Phone || null,
+      parent1Whatsapp: parent1Whatsapp ? 1 : 0,
+      parent2Name: parent2Name || null,
+      parent2Phone: parent2Phone || null,
+      parent2Whatsapp: parent2Whatsapp ? 1 : 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      group: groupId ? { id: groupId, name: null } : null,
+      parent: parentId ? { id: parentId, fullName: null, phone: null } : null,
+    };
 
     return NextResponse.json({ student });
   } catch (error) {

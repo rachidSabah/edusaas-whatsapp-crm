@@ -112,39 +112,28 @@ export async function POST(request: NextRequest) {
 
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Use executeWithVerify for reliable persistence
-    const createResult = await db.executeWithVerify<Course>(
+    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    await db.execute(
       `INSERT INTO courses (id, organizationId, name, code, description, duration, fee, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0],
-      `SELECT * FROM courses WHERE id = ?`,
-      [id]
+      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0]
     );
 
-    // If verification failed, try more explicit fetches with increasing delays
-    let course = createResult.data?.[0];
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (!course && retryCount < maxRetries) {
-      retryCount++;
-      const delay = 500 * retryCount;
-      console.warn(`[Create course] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      const retryResult = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
-      course = retryResult[0];
-    }
+    // Build the course object from what we just inserted — no replica lag possible
+    const course: Course = {
+      id,
+      organizationId: user.organizationId,
+      name,
+      code: code || null,
+      description: description || null,
+      duration: duration || null,
+      fee: fee || 0,
+      isActive: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (!course) {
-      console.error(`[Create course] Failed to verify course ${id} after all retries`);
-      return NextResponse.json(
-        { error: 'Course created but verification failed. Please refresh the page.' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`[Create course] Successfully created and verified course: ${course.name} (${course.id})`);
+    console.log(`[Create course] Successfully inserted course: ${course.name} (${course.id})`);
     return NextResponse.json({ success: true, course });
   } catch (error) {
     console.error('Create course error:', error);
