@@ -24,7 +24,36 @@ export async function GET(request: NextRequest) {
     const db = getDbContext();
 
     if (!user.organizationId) {
-      return NextResponse.json({ courses: [] });
+      return NextResponse.json({ 
+        courses: [],
+        message: 'Aucune organisation associée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Courses API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({ 
+        courses: [],
+        message: 'Organisation non trouvée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
     const { searchParams } = new URL(request.url);
@@ -41,7 +70,13 @@ export async function GET(request: NextRequest) {
     sql += ` ORDER BY createdAt DESC`;
 
     const courses = await db.query<Course>(sql, args);
-    return NextResponse.json({ courses });
+    return NextResponse.json({ courses }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get courses error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -77,14 +112,40 @@ export async function POST(request: NextRequest) {
 
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Course>(
       `INSERT INTO courses (id, organizationId, name, code, description, duration, fee, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0]
+      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0],
+      `SELECT * FROM courses WHERE id = ?`,
+      [id]
     );
 
-    const courses = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
-    return NextResponse.json({ course: courses[0] });
+    // If verification failed, try more explicit fetches with increasing delays
+    let course = createResult.data?.[0];
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!course && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create course] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      const retryResult = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
+      course = retryResult[0];
+    }
+
+    if (!course) {
+      console.error(`[Create course] Failed to verify course ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Course created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create course] Successfully created and verified course: ${course.name} (${course.id})`);
+    return NextResponse.json({ success: true, course });
   } catch (error) {
     console.error('Create course error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

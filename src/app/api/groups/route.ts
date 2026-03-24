@@ -31,7 +31,36 @@ export async function GET(request: NextRequest) {
     const db = getDbContext();
 
     if (!user.organizationId) {
-      return NextResponse.json({ groups: [] });
+      return NextResponse.json({ 
+        groups: [],
+        message: 'Aucune organisation associée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Groups API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({ 
+        groups: [],
+        message: 'Organisation non trouvée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
     // Get groups with student count
@@ -52,7 +81,13 @@ export async function GET(request: NextRequest) {
       teacher: row.teacherId ? { id: row.teacherId, name: row.teacherName } : null,
     }));
 
-    return NextResponse.json({ groups });
+    return NextResponse.json({ groups }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get groups error:', error);
     return NextResponse.json(
@@ -112,10 +147,11 @@ export async function POST(request: NextRequest) {
 
     const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Group>(
       `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity, 
        year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         user.organizationId,
@@ -130,21 +166,45 @@ export async function POST(request: NextRequest) {
         year2StartDate || null,
         year2EndDate || null,
         currentYear || 1,
-      ]
-    );
-
-    // Fetch the created group
-    const result = await db.query<Group>(
+      ],
       `SELECT g.*, u.name as teacherName
-            FROM groups g
-            LEFT JOIN users u ON g.teacherId = u.id
-            WHERE g.id = ?`,
+       FROM groups g
+       LEFT JOIN users u ON g.teacherId = u.id
+       WHERE g.id = ?`,
       [id]
     );
 
-    const group = result[0];
+    // If verification failed, try more explicit fetches with increasing delays
+    let group = createResult.data?.[0];
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!group && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create group] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      const retryResult = await db.query<Group>(
+        `SELECT g.*, u.name as teacherName
+         FROM groups g
+         LEFT JOIN users u ON g.teacherId = u.id
+         WHERE g.id = ?`,
+        [id]
+      );
+      group = retryResult[0];
+    }
 
-    return NextResponse.json({ group });
+    if (!group) {
+      console.error(`[Create group] Failed to verify group ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Group created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create group] Successfully created and verified group: ${group.name} (${group.id})`);
+    return NextResponse.json({ success: true, group });
   } catch (error) {
     console.error('Create group error:', error);
     return NextResponse.json(

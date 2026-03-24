@@ -64,10 +64,103 @@ export async function GET(request: NextRequest) {
           totalPages: 0,
         },
         message: 'Aucune organisation associée. Veuillez contacter l\'administrateur pour rejoindre une organisation.',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Students API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({
+        students: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+        },
+        message: 'Organisation non trouvée. Veuillez contacter l\'administrateur.',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    // If ID is provided, fetch single student
+    if (id) {
+      const result = await db.query<Student>(
+        `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
+         FROM students s 
+         LEFT JOIN groups g ON s.groupId = g.id 
+         LEFT JOIN parents p ON s.parentId = p.id 
+         WHERE s.id = ? AND s.organizationId = ?`,
+        [id, user.organizationId]
+      );
+
+      if (result.length === 0) {
+        return NextResponse.json(
+          { error: 'Étudiant non trouvé', message: 'L\'étudiant demandé n\'existe pas ou vous n\'avez pas les droits d\'accès.' },
+          { status: 404 }
+        );
+      }
+
+      const row = result[0];
+      const student = {
+        id: row.id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        fullName: row.fullName,
+        email: row.email,
+        phone: row.phone,
+        dateOfBirth: row.dateOfBirth,
+        gender: row.gender,
+        address: row.address,
+        studentId: row.studentId,
+        program: row.program,
+        groupId: row.groupId,
+        parentId: row.parentId,
+        enrollmentDate: row.enrollmentDate,
+        status: row.status,
+        currentYear: row.currentYear || 1,
+        notes: row.notes,
+        disciplineNotes: row.disciplineNotes,
+        incidentNotes: row.incidentNotes,
+        performanceNotes: row.performanceNotes,
+        absences: row.absences ? JSON.parse(row.absences) : [],
+        retards: row.retards ? JSON.parse(row.retards) : [],
+        avertissements: row.avertissements || 0,
+        miseAPied: row.miseAPied || 0,
+        parent1Name: row.parent1Name || null,
+        parent1Phone: row.parent1Phone || null,
+        parent1Whatsapp: row.parent1Whatsapp || 0,
+        parent2Name: row.parent2Name || null,
+        parent2Phone: row.parent2Phone || null,
+        parent2Whatsapp: row.parent2Whatsapp || 0,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        group: row.groupId ? { id: row.groupId, name: row.groupName } : null,
+        parent: row.parentId ? { id: row.parentId, fullName: row.parentName, phone: row.parentPhone } : null,
+      };
+
+      return NextResponse.json({ student });
+    }
+
     const status = searchParams.get('status');
     const groupId = searchParams.get('groupId');
     const search = searchParams.get('search');
@@ -175,6 +268,12 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Get students error:', error);
@@ -253,7 +352,8 @@ export async function POST(request: NextRequest) {
     const id = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const studentIdVal = customStudentId || `STD${Date.now()}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Student>(
       `INSERT INTO students (id, organizationId, firstName, lastName, fullName, email, phone, dateOfBirth, gender, address, 
        studentId, program, groupId, parentId, enrollmentDate, status, currentYear, notes, disciplineNotes, incidentNotes, 
        performanceNotes, absences, retards, avertissements, miseAPied, 
@@ -288,11 +388,7 @@ export async function POST(request: NextRequest) {
         parent2Name || null,
         parent2Phone || null,
         parent2Whatsapp ? 1 : 0,
-      ]
-    );
-
-    // Fetch the created student
-    const result = await db.query<Student>(
+      ],
       `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
        FROM students s 
        LEFT JOIN groups g ON s.groupId = g.id 
@@ -301,7 +397,22 @@ export async function POST(request: NextRequest) {
       [id]
     );
 
-    const row = result[0];
+    // If verification failed, try one more fetch
+    let row = createResult.data?.[0];
+    if (!row) {
+      console.warn('[Create student] Verification failed, retrying fetch...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const retryResult = await db.query<Student>(
+        `SELECT s.*, g.name as groupName, p.fullName as parentName, p.phone as parentPhone 
+         FROM students s 
+         LEFT JOIN groups g ON s.groupId = g.id 
+         LEFT JOIN parents p ON s.parentId = p.id 
+         WHERE s.id = ?`,
+        [id]
+      );
+      row = retryResult[0];
+    }
+
     const student = row ? {
       ...row,
       currentYear: row.currentYear || 1,

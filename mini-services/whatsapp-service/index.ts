@@ -5,14 +5,15 @@
  * It runs as a separate Node.js process and communicates with the main app via HTTP API.
  */
 
-import makeWASocket, { 
+// Import Baileys - using require style for CommonJS compatibility
+import baileys from '@whiskeysockets/baileys';
+const { 
+  makeWASocket, 
   useMultiFileAuthState, 
   fetchLatestBaileysVersion,
-  DisconnectReason,
-  type WASocket,
-  type AuthenticationState,
-  type WAMessage
-} from '@whiskeysockets/baileys';
+  DisconnectReason
+} = baileys;
+
 import { Boom } from '@hapi/boom';
 import P from 'pino';
 import qrcodeTerminal from 'qrcode-terminal';
@@ -34,7 +35,7 @@ const logger = P({ level: 'silent' }, 'error');
 
 // Store connections per organization
 const connections = new Map<string, {
-  socket: WASocket;
+  socket: any;
   status: 'connecting' | 'connected' | 'disconnected';
   qrCode?: string;
   phone?: string;
@@ -162,7 +163,7 @@ async function startWhatsAppConnection(organizationId: string): Promise<void> {
 
   const socket = makeWASocket({
     version,
-    auth: state as AuthenticationState,
+    auth: state as any,
     logger,
     printQRInTerminal: true,
     browser: ['EduSaaS', 'Chrome', '1.0.0'],

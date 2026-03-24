@@ -25,7 +25,36 @@ export async function GET(request: NextRequest) {
     const db = getDbContext();
 
     if (!user.organizationId) {
-      return NextResponse.json({ classrooms: [] });
+      return NextResponse.json({ 
+        classrooms: [],
+        message: 'Aucune organisation associée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    // Verify organization exists
+    const orgCheck = await db.query<{ id: string }>(
+      `SELECT id FROM organizations WHERE id = ?`,
+      [user.organizationId]
+    );
+    
+    if (orgCheck.length === 0) {
+      console.warn(`[Classrooms API] Organization ${user.organizationId} not found for user ${user.id}`);
+      return NextResponse.json({ 
+        classrooms: [],
+        message: 'Organisation non trouvée.'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
     const { searchParams } = new URL(request.url);
@@ -43,7 +72,13 @@ export async function GET(request: NextRequest) {
     sql += ` ORDER BY name ASC`;
 
     const classrooms = await db.query<Classroom>(sql, args);
-    return NextResponse.json({ classrooms });
+    return NextResponse.json({ classrooms }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Get classrooms error:', error);
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
@@ -79,14 +114,40 @@ export async function POST(request: NextRequest) {
 
     const id = `classroom_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    await db.execute(
+    // Use executeWithVerify for reliable persistence
+    const createResult = await db.executeWithVerify<Classroom>(
       `INSERT INTO classrooms (id, organizationId, name, code, capacity, building, floor, facilities, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null]
+      [id, user.organizationId, name, code || null, capacity || 30, building || null, floor || null, facilities || null],
+      `SELECT * FROM classrooms WHERE id = ?`,
+      [id]
     );
 
-    const classrooms = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
-    return NextResponse.json({ classroom: classrooms[0] });
+    // If verification failed, try more explicit fetches with increasing delays
+    let classroom = createResult.data?.[0];
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!classroom && retryCount < maxRetries) {
+      retryCount++;
+      const delay = 500 * retryCount;
+      console.warn(`[Create classroom] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      const retryResult = await db.query<Classroom>(`SELECT * FROM classrooms WHERE id = ?`, [id]);
+      classroom = retryResult[0];
+    }
+
+    if (!classroom) {
+      console.error(`[Create classroom] Failed to verify classroom ${id} after all retries`);
+      return NextResponse.json(
+        { error: 'Classroom created but verification failed. Please refresh the page.' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Create classroom] Successfully created and verified classroom: ${classroom.name} (${classroom.id})`);
+    return NextResponse.json({ success: true, classroom });
   } catch (error) {
     console.error('Create classroom error:', error);
     return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });

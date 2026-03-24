@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateDocxContent(student: Student, logs: StudentLog[]): Buffer {
+function generateDocxContent(student: Student, logs: StudentLog[]): Uint8Array {
   // Create a proper DOCX structure with XML
   const now = new Date();
   const generatedDate = now.toLocaleDateString('fr-FR', {
@@ -589,9 +589,9 @@ function generateDocxContent(student: Student, logs: StudentLog[]): Buffer {
   </w:body>
 </w:document>`;
 
-  // Create a minimal DOCX structure (ZIP file with XML)
-  // For now, return just the XML as a buffer (browsers can open it)
-  return Buffer.from(documentXml, 'utf-8');
+  // Use TextEncoder for Edge Runtime compatibility instead of Buffer
+  const encoder = new TextEncoder();
+  return encoder.encode(documentXml);
 }
 
 function getTypeLabel(type: string): string {

@@ -49,7 +49,11 @@ export default function CoursesPage() {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
 
-      const response = await fetch(`/api/courses?${params}`);
+      const response = await fetch(`/api/courses?${params}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       const data = await response.json();
       setCourses(data.courses || []);
     } catch (error) {
@@ -85,16 +89,33 @@ export default function CoursesPage() {
         }),
       });
 
-      if (response.ok) {
+      const responseData = await response.json();
+
+      if (response.ok && responseData.success !== false) {
         setDialogOpen(false);
         setEditingCourse(null);
         setFormData({ name: '', code: '', description: '', duration: '', fee: '' });
-        // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchCourses();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingCourse) {
+          // Update existing course in local state
+          setCourses(prev => prev.map(c => c.id === editingCourse.id 
+            ? { ...c, ...responseData.course } 
+            : c
+          ));
+        } else if (responseData.course) {
+          // Add new course to local state immediately
+          setCourses(prev => [responseData.course, ...prev]);
+          console.log('[Courses] Added new course to UI:', responseData.course.name);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => {
+          console.log('[Courses] Re-fetching courses after creation...');
+          fetchCourses();
+        }, 2500);
       } else {
-        const data = await response.json();
-        alert(data.error || 'Erreur lors de la sauvegarde');
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving course:', error);

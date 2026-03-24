@@ -50,7 +50,11 @@ export default function ClassroomsPage() {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
 
-      const response = await fetch(`/api/classrooms?${params}`);
+      const response = await fetch(`/api/classrooms?${params}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       const data = await response.json();
       setClassrooms(data.classrooms || []);
     } catch (error) {
@@ -80,16 +84,33 @@ export default function ClassroomsPage() {
         }),
       });
 
-      if (response.ok) {
+      const responseData = await response.json();
+
+      if (response.ok && responseData.success !== false) {
         setDialogOpen(false);
         setEditingClassroom(null);
         setFormData({ name: '', code: '', capacity: '', building: '', floor: '', facilities: '' });
-        // Attendre un peu puis rafraîchir
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await fetchClassrooms();
+        
+        // Immediately add/update in local state for instant UI feedback
+        if (editingClassroom) {
+          // Update existing classroom in local state
+          setClassrooms(prev => prev.map(c => c.id === editingClassroom.id 
+            ? { ...c, ...responseData.classroom } 
+            : c
+          ));
+        } else if (responseData.classroom) {
+          // Add new classroom to local state immediately
+          setClassrooms(prev => [responseData.classroom, ...prev]);
+          console.log('[Classrooms] Added new classroom to UI:', responseData.classroom.name);
+        }
+        
+        // Then re-fetch to sync with server (with longer delay for Turso replication)
+        setTimeout(() => {
+          console.log('[Classrooms] Re-fetching classrooms after creation...');
+          fetchClassrooms();
+        }, 2500);
       } else {
-        const data = await response.json();
-        alert(data.error || 'Erreur lors de la sauvegarde');
+        alert(responseData.error || 'Erreur lors de la sauvegarde');
       }
     } catch (error) {
       console.error('Error saving classroom:', error);

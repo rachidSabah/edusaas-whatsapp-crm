@@ -33,6 +33,18 @@ export async function GET(request: NextRequest) {
 
     // Get all tasks
     const tasks = await tursoQuery(dbUrl, dbToken, `SELECT * FROM tasks`, []);
+    
+    // Get all groups
+    const groups = await tursoQuery(dbUrl, dbToken, `SELECT * FROM groups`, []);
+    
+    // Get all students
+    const students = await tursoQuery(dbUrl, dbToken, `SELECT id, organizationId, firstName, lastName, groupId, status FROM students`, []);
+    
+    // Get all classrooms
+    const classrooms = await tursoQuery(dbUrl, dbToken, `SELECT * FROM classrooms`, []);
+    
+    // Get all courses
+    const courses = await tursoQuery(dbUrl, dbToken, `SELECT * FROM courses`, []);
 
     return NextResponse.json({
       database: {
@@ -47,6 +59,14 @@ export async function GET(request: NextRequest) {
       teachersCount: teachers.length,
       tasks: tasks,
       tasksCount: tasks.length,
+      groups: groups,
+      groupsCount: groups.length,
+      students: students,
+      studentsCount: students.length,
+      classrooms: classrooms,
+      classroomsCount: classrooms.length,
+      courses: courses,
+      coursesCount: courses.length,
     });
   } catch (error: any) {
     return NextResponse.json({

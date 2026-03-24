@@ -3,6 +3,9 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { BaileysSessionService } from '@/lib/baileys-service';
 
+// Render service URL with fallback
+const RENDER_SERVICE_URL = process.env.RENDER_BAILEYS_URL || 'https://edusaas-whatsapp-baileys.onrender.com';
+
 /**
  * GET /api/whatsapp/baileys/qr
  * Get the current QR code for Baileys connection
@@ -15,16 +18,50 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const phoneNumber = searchParams.get('phoneNumber') || 'default';
 
-    // Get existing session
+    // First, try to get QR from Render service directly
+    try {
+      const renderResponse = await fetch(`${RENDER_SERVICE_URL}/qr?phoneNumber=${encodeURIComponent(phoneNumber)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        // Short timeout to avoid hanging
+        signal: AbortSignal.timeout(8000),
+      });
+      
+      if (renderResponse.ok) {
+        const renderData = await renderResponse.json();
+        // If Render has a valid response, return it
+        if (renderData.status === 'connected' || renderData.qrCode) {
+          return NextResponse.json(renderData, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+        }
+      }
+    } catch (renderError) {
+      console.log('Render service unavailable, falling back to database:', renderError);
+      // Continue to database fallback
+    }
+
+    // Get existing session from database
     const session = await BaileysSessionService.getSession(phoneNumber);
 
     if (!session) {
       return NextResponse.json(
         {
-          error: 'No session found',
-          message: 'Please initiate a new connection first',
+          status: 'waiting',
+          message: 'Aucune session trouvée. Cliquez sur "Démarrer la connexion" pour commencer.',
         },
-        { status: 404 }
+        { 
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        }
       );
     }
 
@@ -33,8 +70,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: 'connected',
         phoneNumber: session.phoneNumber,
-        message: 'Already connected to WhatsApp',
+        message: 'Déjà connecté à WhatsApp',
         lastActivity: session.lastActivity,
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 
@@ -44,7 +87,13 @@ export async function GET(request: NextRequest) {
         status: 'pending',
         qrCode: session.qrCode,
         phoneNumber: session.phoneNumber,
-        message: 'Scan the QR code with your WhatsApp app',
+        message: 'Scannez le code QR avec votre application WhatsApp',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 
@@ -52,13 +101,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: 'waiting',
       phoneNumber: session.phoneNumber,
-      message: 'Waiting for QR code generation. Please try again in a few seconds.',
+      message: 'En attente de génération du code QR. Veuillez réessayer dans quelques secondes.',
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Error getting QR code:', error);
     return NextResponse.json(
-      { error: 'Failed to get QR code' },
-      { status: 500 }
+      { 
+        status: 'error',
+        error: 'Failed to get QR code',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   }
 }
@@ -77,47 +143,94 @@ export async function POST(request: NextRequest) {
     if (existingSession?.status === 'connected') {
       return NextResponse.json(
         {
-          error: 'Already connected',
-          message: 'This phone number is already connected to WhatsApp',
+          status: 'connected',
+          message: 'Ce numéro est déjà connecté à WhatsApp',
+          phoneNumber,
         },
-        { status: 400 }
+        { 
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        }
       );
     }
 
     // Create new session with connecting status
     await BaileysSessionService.updateStatus(phoneNumber, 'connecting');
 
-    // In a real implementation, this would trigger the Baileys connection
-    // We will now call the Render service to initiate the connection
-    const RENDER_SERVICE_URL = 'https://edusaas-whatsapp-baileys.onrender.com';
+    // Call the Render service to initiate the connection
+    let renderConnected = false;
+    let renderError = null;
     
     try {
       const renderResponse = await fetch(`${RENDER_SERVICE_URL}/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId: phoneNumber })
+        body: JSON.stringify({ organizationId: phoneNumber }),
+        signal: AbortSignal.timeout(15000), // 15 second timeout
       });
       
-      if (!renderResponse.ok) {
-        throw new Error('Failed to connect to Render service');
+      if (renderResponse.ok) {
+        renderConnected = true;
+        const renderData = await renderResponse.json();
+        // If Render returns a QR code immediately, pass it through
+        if (renderData.qrCode) {
+          return NextResponse.json({
+            status: 'pending',
+            phoneNumber,
+            qrCode: renderData.qrCode,
+            message: 'Scannez le code QR avec votre application WhatsApp',
+          }, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+        }
+      } else {
+        renderError = `Render service returned ${renderResponse.status}`;
       }
     } catch (e) {
       console.error('Render service error:', e);
-      // Fallback to local status update if Render is down
+      renderError = e instanceof Error ? e.message : 'Unknown error';
+      // Continue with local status - Render might be waking up
     }
-
-    await BaileysSessionService.updateStatus(phoneNumber, 'connecting');
 
     return NextResponse.json({
       status: 'pending',
       phoneNumber,
-      message: 'Connection initiated on Render. Please wait for the QR code to appear.',
+      message: renderConnected 
+        ? 'Connexion initiée. Veuillez attendre l\'apparition du code QR.'
+        : 'Service en cours de démarrage. Veuillez réessayer dans 30 secondes.',
+      renderStatus: renderConnected ? 'connected' : 'waking_up',
+      renderError: renderError,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Error initiating Baileys connection:', error);
     return NextResponse.json(
-      { error: 'Failed to initiate connection' },
-      { status: 500 }
+      { 
+        status: 'error',
+        error: 'Failed to initiate connection',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   }
 }
@@ -131,18 +244,47 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const phoneNumber = searchParams.get('phoneNumber') || 'default';
 
+    // Also disconnect from Render service
+    try {
+      await fetch(`${RENDER_SERVICE_URL}/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: phoneNumber }),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (e) {
+      console.log('Render disconnect error (non-critical):', e);
+    }
+
     await BaileysSessionService.disconnectSession(phoneNumber);
 
     return NextResponse.json({
       status: 'disconnected',
       phoneNumber,
-      message: 'Session disconnected successfully',
+      message: 'Session déconnectée avec succès',
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Error disconnecting session:', error);
     return NextResponse.json(
-      { error: 'Failed to disconnect' },
-      { status: 500 }
+      { 
+        status: 'error',
+        error: 'Failed to disconnect',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   }
 }
