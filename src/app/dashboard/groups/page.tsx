@@ -122,24 +122,8 @@ export default function GroupsPage() {
           currentYear: '1',
         });
         
-        // Immediately add/update in local state for instant UI feedback
-        if (editingGroup) {
-          // Update existing group in local state
-          setGroups(prev => prev.map(g => g.id === editingGroup.id 
-            ? { ...g, ...responseData.group, studentCount: g.studentCount || 0 } 
-            : g
-          ));
-        } else if (responseData.group) {
-          // Add new group to local state immediately
-          const newGroup: Group = {
-            ...responseData.group,
-            studentCount: 0
-          };
-          setGroups(prev => [newGroup, ...prev]);
-          console.log('[Groups] Added new group to UI:', newGroup.name);
-        }
-        
-        // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
+        // Re-fetch immediately — the API already waits for Turso verification before responding
+        fetchGroups();
       } else {
         console.error('Error response:', responseData);
         alert(responseData.error || 'Erreur lors de la sauvegarde');
