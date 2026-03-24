@@ -147,8 +147,8 @@ export async function POST(request: NextRequest) {
 
     const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Use executeWithVerify for reliable persistence
-    const createResult = await db.executeWithVerify<Group>(
+    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    await db.execute(
       `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity, 
        year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -166,60 +166,30 @@ export async function POST(request: NextRequest) {
         year2StartDate || null,
         year2EndDate || null,
         currentYear || 1,
-      ],
-      `SELECT g.*, u.name as teacherName
-       FROM groups g
-       LEFT JOIN users u ON g.teacherId = u.id
-       WHERE g.id = ?`,
-      [id]
+      ]
     );
 
-    // If verification failed, try more explicit fetches with increasing delays
-    let group = createResult.data?.[0];
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (!group && retryCount < maxRetries) {
-      retryCount++;
-      const delay = 500 * retryCount;
-      console.warn(`[Create group] Verification failed, retry ${retryCount}/${maxRetries} after ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      const retryResult = await db.query<Group>(
-        `SELECT g.*, u.name as teacherName
-         FROM groups g
-         LEFT JOIN users u ON g.teacherId = u.id
-         WHERE g.id = ?`,
-        [id]
-      );
-      group = retryResult[0];
-    }
+    // Build the group object from what we just inserted — no need to query back
+    const group: Group = {
+      id,
+      organizationId: user.organizationId,
+      name,
+      code: code || null,
+      description: description || null,
+      schedule: schedule || null,
+      teacherId: teacherId || null,
+      capacity: capacity || null,
+      year1StartDate: year1StartDate || null,
+      year1EndDate: year1EndDate || null,
+      year2StartDate: year2StartDate || null,
+      year2EndDate: year2EndDate || null,
+      currentYear: currentYear || 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      teacherName: null,
+    };
 
-    if (!group) {
-      // The INSERT succeeded (no exception), but the read-replica hasn't synced yet.
-      // Return success with a synthetic group object built from what we inserted.
-      console.warn(`[Create group] Read-replica lag — returning synthetic group object for ${id}`);
-      group = {
-        id,
-        organizationId: user.organizationId,
-        name,
-        code: code || null,
-        description: description || null,
-        schedule: schedule || null,
-        teacherId: teacherId || null,
-        capacity: capacity || null,
-        year1StartDate: year1StartDate || null,
-        year1EndDate: year1EndDate || null,
-        year2StartDate: year2StartDate || null,
-        year2EndDate: year2EndDate || null,
-        currentYear: currentYear || 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        teacherName: null,
-      };
-    }
-
-    console.log(`[Create group] Successfully created group: ${group.name} (${group.id})`);
+    console.log(`[Create group] Successfully inserted group: ${group.name} (${group.id})`);
     return NextResponse.json({ success: true, group });
   } catch (error) {
     console.error('Create group error:', error);
