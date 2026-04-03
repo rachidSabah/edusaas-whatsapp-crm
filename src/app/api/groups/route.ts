@@ -102,18 +102,50 @@ export async function GET(request: NextRequest) {
 
 // Create group
 export async function POST(request: NextRequest) {
+  const requestId = `group_${Date.now()}`;
+  console.log(`[${requestId}] === CREATE GROUP START ===`);
+  
   try {
-    const user = await requireAuth();
+    // Step 1: Authenticate user
+    console.log(`[${requestId}] Step 1: Authenticating user...`);
+    let user;
+    try {
+      user = await requireAuth();
+      console.log(`[${requestId}] User authenticated: ${user.email} (${user.role})`);
+    } catch (authError) {
+      console.error(`[${requestId}] Authentication failed:`, authError);
+      return NextResponse.json({ 
+        error: 'Non autorisé', 
+        details: authError instanceof Error ? authError.message : String(authError)
+      }, { status: 401 });
+    }
+    
     const db = getDbContext();
+    console.log(`[${requestId}] Database context obtained`);
 
     if (!user.organizationId) {
+      console.error(`[${requestId}] No organization for user: ${user.id}`);
       return NextResponse.json(
-        { error: 'No organization associated' },
+        { error: 'No organization associated', details: 'User does not have an organization assigned' },
         { status: 400 }
       );
     }
+    console.log(`[${requestId}] User organization: ${user.organizationId}`);
 
-    const body = await request.json();
+    // Step 2: Parse request body
+    console.log(`[${requestId}] Step 2: Parsing request body...`);
+    let body;
+    try {
+      body = await request.json();
+      console.log(`[${requestId}] Request body:`, JSON.stringify(body).substring(0, 200));
+    } catch (parseError) {
+      console.error(`[${requestId}] Failed to parse request body:`, parseError);
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parseError instanceof Error ? parseError.message : String(parseError) },
+        { status: 400 }
+      );
+    }
+    
     const { 
       name, 
       code, 
@@ -129,19 +161,32 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!name) {
+      console.error(`[${requestId}] Missing required field: name`);
       return NextResponse.json(
         { error: 'Group name is required' },
         { status: 400 }
       );
     }
 
-    // Check if group with this name already exists
-    const existing = await db.query<{ id: string }>(
-      `SELECT id FROM groups WHERE organizationId = ? AND name = ?`,
-      [user.organizationId, name]
-    );
+    // Step 3: Check for duplicate
+    console.log(`[${requestId}] Step 3: Checking for duplicate group...`);
+    let existing;
+    try {
+      existing = await db.query<{ id: string }>(
+        `SELECT id FROM groups WHERE organizationId = ? AND name = ?`,
+        [user.organizationId, name]
+      );
+      console.log(`[${requestId}] Duplicate check result: ${existing.length} existing groups`);
+    } catch (dupCheckError) {
+      console.error(`[${requestId}] Duplicate check failed:`, dupCheckError);
+      return NextResponse.json(
+        { error: 'Database error during duplicate check', details: dupCheckError instanceof Error ? dupCheckError.message : String(dupCheckError) },
+        { status: 500 }
+      );
+    }
 
     if (existing.length > 0) {
+      console.error(`[${requestId}] Duplicate group found: ${existing[0].id}`);
       return NextResponse.json(
         { error: 'Group with this name already exists' },
         { status: 400 }
@@ -149,22 +194,37 @@ export async function POST(request: NextRequest) {
     }
 
     const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[${requestId}] Generated group ID: ${id}`);
 
-    // Simple INSERT — omitting study period fields so it works even if DB hasn't been migrated
-    await db.execute(
-      `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        user.organizationId,
-        name,
-        code || null,
-        description || null,
-        schedule || null,
-        teacherId || null,
-        capacity || null,
-      ]
-    );
+    // Step 4: Insert group
+    console.log(`[${requestId}] Step 4: Inserting group into database...`);
+    try {
+      await db.execute(
+        `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          user.organizationId,
+          name,
+          code || null,
+          description || null,
+          schedule || null,
+          teacherId || null,
+          capacity || null,
+        ]
+      );
+      console.log(`[${requestId}] Group inserted successfully`);
+    } catch (insertError) {
+      console.error(`[${requestId}] Insert failed:`, insertError);
+      return NextResponse.json(
+        { 
+          error: 'Failed to create group', 
+          details: insertError instanceof Error ? insertError.message : String(insertError),
+          sql: 'INSERT INTO groups'
+        },
+        { status: 500 }
+      );
+    }
 
     // Build the group object from what we just inserted — no need to query back
     const group: Group = {
@@ -186,16 +246,16 @@ export async function POST(request: NextRequest) {
       teacherName: null,
     };
 
-    console.log(`[Create group] Successfully inserted group: ${group.name} (${group.id})`);
+    console.log(`[${requestId}] === CREATE GROUP SUCCESS ===`);
     return NextResponse.json({ success: true, group });
   } catch (error) {
-    console.error('Create group error:', error);
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[${requestId}] Unexpected error:`, error);
     return NextResponse.json(
-      { error: `DEBUG SQL ERROR: ${errorMsg}`, details: String(error) },
+      { 
+        error: 'Internal server error', 
+        details: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

@@ -89,40 +89,99 @@ export async function GET(request: NextRequest) {
 
 // Create course
 export async function POST(request: NextRequest) {
+  const requestId = `course_${Date.now()}`;
+  console.log(`[${requestId}] === CREATE COURSE START ===`);
+  
   try {
-    const user = await requireAuth();
+    // Step 1: Authenticate user
+    console.log(`[${requestId}] Step 1: Authenticating user...`);
+    let user;
+    try {
+      user = await requireAuth();
+      console.log(`[${requestId}] User authenticated: ${user.email} (${user.role})`);
+    } catch (authError) {
+      console.error(`[${requestId}] Authentication failed:`, authError);
+      return NextResponse.json({ 
+        error: 'Non autorisé', 
+        details: authError instanceof Error ? authError.message : String(authError)
+      }, { status: 401 });
+    }
+    
     const db = getDbContext();
+    console.log(`[${requestId}] Database context obtained`);
 
     if (!user.organizationId) {
-      return NextResponse.json({ error: 'No organization associated' }, { status: 400 });
+      console.error(`[${requestId}] No organization for user: ${user.id}`);
+      return NextResponse.json({ 
+        error: 'No organization associated',
+        details: 'User does not have an organization assigned'
+      }, { status: 400 });
     }
+    console.log(`[${requestId}] User organization: ${user.organizationId}`);
 
-    const body = await request.json();
+    // Step 2: Parse request body
+    console.log(`[${requestId}] Step 2: Parsing request body...`);
+    let body;
+    try {
+      body = await request.json();
+      console.log(`[${requestId}] Request body:`, JSON.stringify(body).substring(0, 200));
+    } catch (parseError) {
+      console.error(`[${requestId}] Failed to parse request body:`, parseError);
+      return NextResponse.json({ 
+        error: 'Invalid request body',
+        details: parseError instanceof Error ? parseError.message : String(parseError)
+      }, { status: 400 });
+    }
+    
     const { name, code, description, duration, fee } = body;
 
     if (!name) {
+      console.error(`[${requestId}] Missing required field: name`);
       return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
     }
 
-    // Check for duplicate (check both name and title columns for compatibility)
-    const existing = await db.query<{ id: string }>(
-      `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
-      [user.organizationId, name, name]
-    );
+    // Step 3: Check for duplicate
+    console.log(`[${requestId}] Step 3: Checking for duplicate course...`);
+    let existing;
+    try {
+      existing = await db.query<{ id: string }>(
+        `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
+        [user.organizationId, name, name]
+      );
+      console.log(`[${requestId}] Duplicate check result: ${existing.length} existing courses`);
+    } catch (dupCheckError) {
+      console.error(`[${requestId}] Duplicate check failed:`, dupCheckError);
+      return NextResponse.json({ 
+        error: 'Database error during duplicate check',
+        details: dupCheckError instanceof Error ? dupCheckError.message : String(dupCheckError)
+      }, { status: 500 });
+    }
 
     if (existing.length > 0) {
+      console.error(`[${requestId}] Duplicate course found: ${existing[0].id}`);
       return NextResponse.json({ error: 'Un cours avec ce nom existe déjà' }, { status: 400 });
     }
 
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[${requestId}] Generated course ID: ${id}`);
 
-    // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
-    // Include both 'title' (required by old schema) and 'name' (new schema) for compatibility
-    await db.execute(
-      `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0]
-    );
+    // Step 4: Insert course
+    console.log(`[${requestId}] Step 4: Inserting course into database...`);
+    try {
+      await db.execute(
+        `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        [id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0]
+      );
+      console.log(`[${requestId}] Course inserted successfully`);
+    } catch (insertError) {
+      console.error(`[${requestId}] Insert failed:`, insertError);
+      return NextResponse.json({ 
+        error: 'Failed to create course',
+        details: insertError instanceof Error ? insertError.message : String(insertError),
+        sql: 'INSERT INTO courses'
+      }, { status: 500 });
+    }
 
     // Build the course object from what we just inserted — no replica lag possible
     const course: Course = {
@@ -138,14 +197,15 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    console.log(`[Create course] Successfully inserted course: ${course.name} (${course.id})`);
+    console.log(`[${requestId}] === CREATE COURSE SUCCESS ===`);
     return NextResponse.json({ success: true, course });
   } catch (error) {
-    console.error('Create course error:', error);
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`[${requestId}] Unexpected error:`, error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 });
   }
 }
 

@@ -111,7 +111,12 @@ export default function CoursesPage() {
         
         // Removed re-fetch timeout to prevent race condition with Turso sync overwriting optimistic UI state
       } else {
-        alert(responseData.error || 'Erreur lors de la sauvegarde');
+        // Display detailed error message for debugging
+        const errorMsg = responseData.details 
+          ? `${responseData.error}: ${responseData.details}`
+          : responseData.error || 'Erreur lors de la sauvegarde';
+        console.error('[Courses] Error response:', responseData);
+        alert(errorMsg);
       }
     } catch (error) {
       console.error('Error saving course:', error);

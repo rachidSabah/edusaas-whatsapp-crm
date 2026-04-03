@@ -137,8 +137,12 @@ export default function GroupsPage() {
         // After 15s the replica should have synced — refresh quietly in the background
         setTimeout(() => fetchGroups(), 15000);
       } else {
-        console.error('Error response:', responseData);
-        alert(responseData.error || 'Erreur lors de la sauvegarde');
+        // Display detailed error message for debugging
+        const errorMsg = responseData.details 
+          ? `${responseData.error}: ${responseData.details}`
+          : responseData.error || 'Erreur lors de la sauvegarde';
+        console.error('[Groups] Error response:', responseData);
+        alert(errorMsg);
       }
     } catch (error) {
       console.error('Error saving group:', error);
