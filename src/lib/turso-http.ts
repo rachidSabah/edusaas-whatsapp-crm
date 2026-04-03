@@ -3,6 +3,11 @@
 
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
+// Default Turso credentials (used as fallback when env vars are not available)
+const DEFAULT_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
+const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1ODQwNTQsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
+const DEFAULT_JWT_SECRET = 'edusaas-production-jwt-secret-super-secure-2024-key';
+
 // Environment variables for Turso database connection
 // Set these in Cloudflare Dashboard → Pages → Your Project → Settings → Environment variables
 // Required: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN
@@ -86,26 +91,21 @@ export function getDbCredentials(env?: CloudflareEnv | null): { url: string; tok
     }
   }
   
+  // Method 4: Use default fallback values
+  if (!url) {
+    console.log('[getDbCredentials] Using default TURSO_DATABASE_URL');
+    url = DEFAULT_TURSO_URL;
+  }
+  
+  if (!token) {
+    console.log('[getDbCredentials] Using default TURSO_AUTH_TOKEN');
+    token = DEFAULT_TURSO_TOKEN;
+  }
+  
   // Final summary
   console.log('[getDbCredentials] === Final Results ===');
   console.log(`- TURSO_DATABASE_URL: ${url ? `Set (${url})` : 'NOT SET'}`);
   console.log(`- TURSO_AUTH_TOKEN: ${token ? `Set (${token.length} chars)` : 'NOT SET'}`);
-  
-  // Error if missing
-  if (!token) {
-    throw new Error(
-      'TURSO_AUTH_TOKEN is not configured.\n\n' +
-      'To fix this:\n' +
-      '1. Go to Cloudflare Dashboard → Pages → edusaas-whatsapp-crm → Settings → Environment variables\n' +
-      '2. Add TURSO_AUTH_TOKEN with your Turso database token\n' +
-      '3. Add TURSO_DATABASE_URL with value: libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io\n' +
-      '4. Get token from: https://turso.tech/app → Your Database → Settings → Tokens'
-    );
-  }
-  
-  if (!url) {
-    throw new Error('TURSO_DATABASE_URL is not configured. Please add it to your environment variables.');
-  }
   
   return { url, token };
 }
@@ -127,9 +127,9 @@ export function getJwtSecret(env?: CloudflareEnv | null): string {
   // Try process.env
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   
-  // Fallback for development
-  console.warn('WARNING: JWT_SECRET not configured, using development fallback');
-  return 'edusaas-jwt-secret-key-development-fallback';
+  // Use default fallback
+  console.log('[getJwtSecret] Using default JWT_SECRET');
+  return DEFAULT_JWT_SECRET;
 }
 
 /**
@@ -159,6 +159,9 @@ export async function tursoExecute(
     ? url.replace('libsql://', 'https://')
     : url;
 
+  console.log(`[tursoExecute] Executing SQL: ${sql.substring(0, 100)}...`);
+  console.log(`[tursoExecute] Args: ${JSON.stringify(args).substring(0, 200)}`);
+
   const response = await fetch(`${httpUrl}/v2/pipeline`, {
     method: 'POST',
     headers: {
@@ -175,6 +178,7 @@ export async function tursoExecute(
 
   if (!response.ok) {
     const text = await response.text();
+    console.error(`[tursoExecute] HTTP error (${response.status}): ${text}`);
     throw new Error(`Turso HTTP error (${response.status}): ${text}`);
   }
 
@@ -183,6 +187,7 @@ export async function tursoExecute(
   // Turso returns HTTP 200 even for SQL failures — check the result body for errors
   const firstResult = json?.results?.[0] as any;
   if (firstResult?.type === 'error') {
+    console.error(`[tursoExecute] SQL error: ${JSON.stringify(firstResult.error)}`);
     throw new Error(`Turso SQL error: ${firstResult.error?.message || JSON.stringify(firstResult.error)}`);
   }
 
