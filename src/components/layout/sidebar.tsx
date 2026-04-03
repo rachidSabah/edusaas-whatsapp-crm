@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -46,7 +46,6 @@ import {
   Mail,
   ClipboardCheck,
   Brain,
-  Bell,
   Webhook,
   Phone,
 } from 'lucide-react';
@@ -110,10 +109,10 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
-  };
+  }, []);
 
   return (
     <div
@@ -137,6 +136,7 @@ export function Sidebar({ user }: SidebarProps) {
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className="text-slate-400 hover:text-white hover:bg-slate-800"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </Button>
@@ -153,7 +153,7 @@ export function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
+      <nav className="flex-1 overflow-y-auto py-4" aria-label="Main navigation">
         <ul className="space-y-1 px-2">
           {menuItems.map((item) => {
             const isActive = pathname === item.href ||
@@ -171,8 +171,9 @@ export function Sidebar({ user }: SidebarProps) {
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   )}
                   title={collapsed ? item.label : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                 >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               </li>
@@ -182,7 +183,7 @@ export function Sidebar({ user }: SidebarProps) {
           {/* Admin Section */}
           {adminMenuItems.filter(item => item.roles.includes(user.role)).length > 0 && (
             <>
-              {!collapsed && <li className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-500 uppercase">Administration</li>}
+              {!collapsed && <li className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-500 uppercase" aria-hidden="true">Administration</li>}
               {adminMenuItems.filter(item => item.roles.includes(user.role)).map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -196,8 +197,9 @@ export function Sidebar({ user }: SidebarProps) {
                           : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       )}
                       title={collapsed ? item.label : undefined}
+                      aria-label={collapsed ? item.label : undefined}
                     >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                       {!collapsed && <span>{item.label}</span>}
                     </Link>
                   </li>
@@ -207,7 +209,7 @@ export function Sidebar({ user }: SidebarProps) {
           )}
           
           {/* User Section */}
-          {!collapsed && <li className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-500 uppercase">Mon Espace</li>}
+          {!collapsed && <li className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-500 uppercase" aria-hidden="true">Mon Espace</li>}
           {userMenuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -221,8 +223,9 @@ export function Sidebar({ user }: SidebarProps) {
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   )}
                   title={collapsed ? item.label : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                 >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               </li>
@@ -241,6 +244,7 @@ export function Sidebar({ user }: SidebarProps) {
                 'w-full justify-start gap-3 text-slate-300 hover:text-white hover:bg-slate-800',
                 collapsed && 'justify-center px-0'
               )}
+              aria-label="User menu"
             >
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user.avatar || undefined} />
@@ -270,7 +274,7 @@ export function Sidebar({ user }: SidebarProps) {
               Paramètres
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+            <DropdownMenuItem onSelect={handleLogout} className="text-red-500 cursor-pointer">
               <LogOut className="w-4 h-4 mr-2" />
               Déconnexion
             </DropdownMenuItem>

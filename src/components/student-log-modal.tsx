@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertCircle, Clock, Calendar } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface StudentLogModalProps {
   open: boolean;
@@ -39,14 +40,16 @@ export function StudentLogModal({
 }: StudentLogModalProps) {
   const [type, setType] = useState('avertissement');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [time, setTime] = useState(new Date().toTimeString().split(' ')[0]);
+  const [time, setTime] = useState(new Date().toTimeString().slice(0, 5)); // HH:MM format
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState('normal');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError(null);
 
     try {
       const response = await fetch('/api/student-logs', {
@@ -66,17 +69,17 @@ export function StudentLogModal({
         onOpenChange(false);
         setType('avertissement');
         setDate(new Date().toISOString().split('T')[0]);
-        setTime(new Date().toTimeString().split(' ')[0]);
+        setTime(new Date().toTimeString().slice(0, 5));
         setDescription('');
         setSeverity('normal');
         onLogAdded?.();
       } else {
         const data = await response.json();
-        alert(data.error || 'Erreur lors de l\'enregistrement');
+        setError(data.error || 'Erreur lors de l\'enregistrement');
       }
-    } catch (error) {
-      console.error('Error saving log:', error);
-      alert('Erreur de connexion au serveur');
+    } catch (err) {
+      console.error('Error saving log:', err);
+      setError('Erreur de connexion au serveur');
     } finally {
       setSaving(false);
     }
@@ -96,6 +99,14 @@ export function StudentLogModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Error Alert */}
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Type */}
           <div className="space-y-2">
             <Label htmlFor="type">Type d'incident</Label>
