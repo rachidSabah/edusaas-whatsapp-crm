@@ -1,8 +1,8 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, hashPassword, verifyPassword } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
+import { requireAuth, hashPassword, verifyPassword } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 // GET current user profile
 export async function GET() {

@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
-import { clearAuthCookie } from '@/lib/auth-edge';
+import { clearAuthCookie } from '@/lib/auth-hybrid';
 
 export async function POST() {
   try {

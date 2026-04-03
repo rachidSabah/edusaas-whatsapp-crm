@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { tursoQuery, type CloudflareEnv } from '@/lib/turso-http';
-import { hashPassword, generateToken, setAuthCookie } from '@/lib/auth-edge';
+import { hashPassword, generateToken, setAuthCookie } from '@/lib/auth-hybrid';
 
 export async function POST(request: NextRequest) {
   try {

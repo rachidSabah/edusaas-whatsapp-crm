@@ -5,8 +5,8 @@ export const runtime = 'edge';
  * Adds parent1Name, parent1Phone, parent1Whatsapp, parent2Name, parent2Phone, parent2Whatsapp to students table
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 const ALTER_TABLE_SQL = [
   `ALTER TABLE students ADD COLUMN parent1Name TEXT`,

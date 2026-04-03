@@ -1,13 +1,7 @@
-// Hybrid Database Client for Cloudflare Pages + Turso
-// This module provides a unified database interface that:
-// 1. Uses D1 when available (Cloudflare Pages with D1 binding)
-// 2. Falls back to Turso HTTP when D1 isn't available
+// Database Client for Cloudflare Pages with D1
+// This module provides database operations using Cloudflare D1
 
-import { createClient, type Client } from '@libsql/client/web';
-
-// Turso credentials (used as fallback)
-const DEFAULT_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1ODQwNTQsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 export interface DbResult<T = unknown> {
   results: T[];
@@ -22,156 +16,85 @@ export interface DbResult<T = unknown> {
 }
 
 export interface DbContext {
-  query: <T = Record<string, unknown>>(sql: string, ...args: unknown[]) => Promise<T[]>;
-  execute: (sql: string, ...args: unknown[]) => Promise<DbResult>;
+  query: <T = Record<string, unknown>>(sql: string, args?: unknown[]) => Promise<T[]>;
+  execute: (sql: string, args?: unknown[]) => Promise<DbResult>;
   batch: (statements: { sql: string; args?: unknown[] }[]) => Promise<DbResult[]>;
 }
 
-// Check if we're in Cloudflare Pages with D1 binding
-function hasD1Binding(): boolean {
+/**
+ * Get D1 database from Cloudflare context
+ */
+function getD1Database(): D1Database {
   try {
-    // Dynamic import to avoid errors in non-Cloudflare environments
-    const { getRequestContext } = require('@cloudflare/next-on-pages');
     const ctx = getRequestContext();
-    const env = ctx.env as { DB?: unknown };
-    return !!env.DB;
-  } catch {
-    return false;
-  }
-}
-
-// Get D1 database (only works in Cloudflare Pages)
-function getD1Database(): unknown {
-  try {
-    const { getRequestContext } = require('@cloudflare/next-on-pages');
-    const ctx = getRequestContext();
-    const env = ctx.env as { DB: unknown };
+    const env = ctx.env as { DB?: D1Database };
+    
+    if (!env.DB) {
+      throw new Error('D1 database binding "DB" not found. Make sure wrangler.toml has [[d1_databases]] configured.');
+    }
+    
     return env.DB;
-  } catch {
-    return null;
+  } catch (error) {
+    console.error('[D1] Failed to get D1 database:', error);
+    throw new Error('Failed to get D1 database. Ensure you are running on Cloudflare Pages with D1 configured.');
   }
-}
-
-// Create Turso client
-function createTursoClient(): Client {
-  const url = DEFAULT_TURSO_URL.startsWith('libsql://') 
-    ? DEFAULT_TURSO_URL.replace('libsql://', 'https://')
-    : DEFAULT_TURSO_URL;
-  
-  return createClient({
-    url,
-    authToken: DEFAULT_TURSO_TOKEN,
-  });
-}
-
-// Convert Turso result to D1-like format
-function convertTursoResult<T>(result: { rows: T[] }): DbResult<T> {
-  return {
-    results: result.rows,
-    success: true,
-    meta: {
-      changes: 0,
-      last_row_id: 0,
-      rows_read: result.rows.length,
-      rows_written: 0,
-    },
-  };
-}
-
-// Convert Turso execute result to D1-like format
-function convertTursoExecResult(result: { rowsAffected?: number; lastInsertRowid?: number | string }): DbResult {
-  return {
-    results: [],
-    success: true,
-    meta: {
-      changes: result.rowsAffected || 0,
-      last_row_id: typeof result.lastInsertRowid === 'string' 
-        ? parseInt(result.lastInsertRowid, 10) 
-        : (result.lastInsertRowid || 0),
-      rows_read: 0,
-      rows_written: result.rowsAffected || 0,
-    },
-  };
 }
 
 /**
- * Get database context - Works with both D1 and Turso
- * This is the main function to use for database operations
+ * Get database context - Uses D1 on Cloudflare Pages
  */
 export function getDbContext(): DbContext {
-  const useD1 = hasD1Binding();
-  console.log(`[DB] Using ${useD1 ? 'D1' : 'Turso'} database`);
-  
-  if (useD1) {
-    // D1 implementation
-    return {
-      query: async <T = Record<string, unknown>>(sql: string, ...args: unknown[]): Promise<T[]> => {
-        const db = getD1Database() as D1Database;
-        console.log(`[D1 Query] ${sql.substring(0, 100)}...`);
-        
+  return {
+    query: async <T = Record<string, unknown>>(sql: string, args: unknown[] = []): Promise<T[]> => {
+      const db = getD1Database();
+      console.log(`[D1 Query] ${sql.substring(0, 100)}...`);
+      console.log(`[D1 Args]`, args);
+      
+      try {
         const stmt = db.prepare(sql);
         const result = await stmt.bind(...args).all<T>();
+        console.log(`[D1 Result] ${result.results?.length || 0} rows`);
         return result.results || [];
-      },
+      } catch (error) {
+        console.error('[D1 Query Error]:', error);
+        throw error;
+      }
+    },
+    
+    execute: async (sql: string, args: unknown[] = []): Promise<DbResult> => {
+      const db = getD1Database();
+      console.log(`[D1 Execute] ${sql.substring(0, 100)}...`);
+      console.log(`[D1 Args]`, args);
       
-      execute: async (sql: string, ...args: unknown[]): Promise<DbResult> => {
-        const db = getD1Database() as D1Database;
-        console.log(`[D1 Execute] ${sql.substring(0, 100)}...`);
-        
+      try {
         const stmt = db.prepare(sql);
         const result = await stmt.bind(...args).run();
+        console.log(`[D1 Execute Result] Success: ${result.success}, Changes: ${result.meta?.changes || 0}`);
         return result;
-      },
+      } catch (error) {
+        console.error('[D1 Execute Error]:', error);
+        throw error;
+      }
+    },
+    
+    batch: async (statements: { sql: string; args?: unknown[] }[]): Promise<DbResult[]> => {
+      const db = getD1Database();
+      console.log(`[D1 Batch] Executing ${statements.length} statements`);
       
-      batch: async (statements: { sql: string; args?: unknown[] }[]): Promise<DbResult[]> => {
-        const db = getD1Database() as D1Database;
+      try {
         const stmts = statements.map(s => {
           const stmt = db.prepare(s.sql);
           return s.args && s.args.length > 0 ? stmt.bind(...s.args) : stmt;
         });
-        return db.batch(stmts);
-      },
-    };
-  } else {
-    // Turso HTTP implementation
-    const turso = createTursoClient();
-    
-    return {
-      query: async <T = Record<string, unknown>>(sql: string, ...args: unknown[]): Promise<T[]> => {
-        console.log(`[Turso Query] ${sql.substring(0, 100)}...`);
-        
-        const result = await turso.execute({
-          sql,
-          args: args as Record<string, unknown>[],
-        });
-        
-        return result.rows as T[];
-      },
-      
-      execute: async (sql: string, ...args: unknown[]): Promise<DbResult> => {
-        console.log(`[Turso Execute] ${sql.substring(0, 100)}...`);
-        
-        const result = await turso.execute({
-          sql,
-          args: args as Record<string, unknown>[],
-        });
-        
-        return convertTursoExecResult(result);
-      },
-      
-      batch: async (statements: { sql: string; args?: unknown[] }[]): Promise<DbResult[]> => {
-        const results: DbResult[] = [];
-        for (const stmt of statements) {
-          const result = await turso.execute({
-            sql: stmt.sql,
-            args: stmt.args as Record<string, unknown>[],
-          });
-          results.push(convertTursoExecResult(result));
-        }
+        const results = await db.batch(stmts);
+        console.log(`[D1 Batch] Completed ${results.length} statements`);
         return results;
-      },
-    };
-  }
+      } catch (error) {
+        console.error('[D1 Batch Error]:', error);
+        throw error;
+      }
+    },
+  };
 }
 
 /**
@@ -179,22 +102,17 @@ export function getDbContext(): DbContext {
  */
 export async function getOne<T = Record<string, unknown>>(
   sql: string, 
-  ...args: unknown[]
+  args: unknown[] = []
 ): Promise<T | null> {
-  const useD1 = hasD1Binding();
+  const db = getD1Database();
   
-  if (useD1) {
-    const db = getD1Database() as D1Database;
+  try {
     const stmt = db.prepare(sql);
     const result = await stmt.bind(...args).first<T>();
     return result || null;
-  } else {
-    const turso = createTursoClient();
-    const result = await turso.execute({
-      sql,
-      args: args as Record<string, unknown>[],
-    });
-    return (result.rows[0] as T) || null;
+  } catch (error) {
+    console.error('[D1 GetOne Error]:', error);
+    throw error;
   }
 }
 
@@ -203,9 +121,9 @@ export async function getOne<T = Record<string, unknown>>(
  */
 export async function query<T = Record<string, unknown>>(
   sql: string, 
-  ...args: unknown[]
+  args: unknown[] = []
 ): Promise<T[]> {
-  return getDbContext().query<T>(sql, ...args);
+  return getDbContext().query<T>(sql, args);
 }
 
 /**
@@ -213,9 +131,9 @@ export async function query<T = Record<string, unknown>>(
  */
 export async function execute(
   sql: string, 
-  ...args: unknown[]
+  args: unknown[] = []
 ): Promise<DbResult> {
-  return getDbContext().execute(sql, ...args);
+  return getDbContext().execute(sql, args);
 }
 
 // Type declarations for D1Database (Cloudflare Workers types)

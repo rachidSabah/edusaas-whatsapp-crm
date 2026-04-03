@@ -1,9 +1,9 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
-import { hashPassword } from '@/lib/auth-edge';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
+import { hashPassword } from '@/lib/auth-hybrid';
 import { USER_ROLES } from '@/lib/constants';
 
 interface User {

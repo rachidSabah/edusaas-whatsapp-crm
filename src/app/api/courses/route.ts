@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     // Verify organization exists
     const orgCheck = await db.query<{ id: string }>(
       `SELECT id FROM organizations WHERE id = ?`,
-      user.organizationId
+      [user.organizationId]
     );
     
     if (orgCheck.length === 0) {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     sql += ` ORDER BY createdAt DESC`;
 
-    const courses = await db.query<Course>(sql, ...args);
+    const courses = await db.query<Course>(sql, args);
     return NextResponse.json({ courses }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -93,25 +93,12 @@ export async function GET(request: NextRequest) {
 // Create course
 export async function POST(request: NextRequest) {
   const requestId = `course_${Date.now()}`;
-  console.log(`[${requestId}] === CREATE COURSE START (Hybrid) ===`);
+  console.log(`[${requestId}] === CREATE COURSE START (D1) ===`);
   
   try {
-    // Step 1: Authenticate user
-    console.log(`[${requestId}] Step 1: Authenticating user...`);
-    let user;
-    try {
-      user = await requireAuth();
-      console.log(`[${requestId}] User authenticated: ${user.email} (${user.role})`);
-    } catch (authError) {
-      console.error(`[${requestId}] Authentication failed:`, authError);
-      return NextResponse.json({ 
-        error: 'Non autorisé', 
-        details: authError instanceof Error ? authError.message : String(authError)
-      }, { status: 401 });
-    }
-    
+    const user = await requireAuth();
     const db = getDbContext();
-    console.log(`[${requestId}] Database context obtained`);
+    console.log(`[${requestId}] User authenticated: ${user.email} (${user.role})`);
 
     if (!user.organizationId) {
       console.error(`[${requestId}] No organization for user: ${user.id}`);
@@ -122,20 +109,7 @@ export async function POST(request: NextRequest) {
     }
     console.log(`[${requestId}] User organization: ${user.organizationId}`);
 
-    // Step 2: Parse request body
-    console.log(`[${requestId}] Step 2: Parsing request body...`);
-    let body;
-    try {
-      body = await request.json();
-      console.log(`[${requestId}] Request body:`, JSON.stringify(body).substring(0, 200));
-    } catch (parseError) {
-      console.error(`[${requestId}] Failed to parse request body:`, parseError);
-      return NextResponse.json({ 
-        error: 'Invalid request body',
-        details: parseError instanceof Error ? parseError.message : String(parseError)
-      }, { status: 400 });
-    }
-    
+    const body = await request.json();
     const { name, code, description, duration, fee } = body;
 
     if (!name) {
@@ -143,22 +117,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
     }
 
-    // Step 3: Check for duplicate
-    console.log(`[${requestId}] Step 3: Checking for duplicate course...`);
-    let existing;
-    try {
-      existing = await db.query<{ id: string }>(
-        `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
-        user.organizationId, name, name
-      );
-      console.log(`[${requestId}] Duplicate check result: ${existing.length} existing courses`);
-    } catch (dupCheckError) {
-      console.error(`[${requestId}] Duplicate check failed:`, dupCheckError);
-      return NextResponse.json({ 
-        error: 'Database error during duplicate check',
-        details: dupCheckError instanceof Error ? dupCheckError.message : String(dupCheckError)
-      }, { status: 500 });
-    }
+    // Check for duplicate
+    console.log(`[${requestId}] Checking for duplicate course...`);
+    const existing = await db.query<{ id: string }>(
+      `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
+      [user.organizationId, name, name]
+    );
+    console.log(`[${requestId}] Duplicate check result: ${existing.length} existing courses`);
 
     if (existing.length > 0) {
       console.error(`[${requestId}] Duplicate course found: ${existing[0].id}`);
@@ -168,25 +133,15 @@ export async function POST(request: NextRequest) {
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     console.log(`[${requestId}] Generated course ID: ${id}`);
 
-    // Step 4: Insert course
-    console.log(`[${requestId}] Step 4: Inserting course into database...`);
-    try {
-      await db.execute(
-        `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0
-      );
-      console.log(`[${requestId}] Course inserted successfully`);
-    } catch (insertError) {
-      console.error(`[${requestId}] Insert failed:`, insertError);
-      return NextResponse.json({ 
-        error: 'Failed to create course',
-        details: insertError instanceof Error ? insertError.message : String(insertError),
-        sql: 'INSERT INTO courses'
-      }, { status: 500 });
-    }
+    // Insert course
+    console.log(`[${requestId}] Inserting course into database...`);
+    await db.execute(
+      `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0]
+    );
+    console.log(`[${requestId}] Course inserted successfully`);
 
-    // Build the course object from what we just inserted
     const course: Course = {
       id,
       organizationId: user.organizationId,
@@ -203,11 +158,10 @@ export async function POST(request: NextRequest) {
     console.log(`[${requestId}] === CREATE COURSE SUCCESS ===`);
     return NextResponse.json({ success: true, course });
   } catch (error) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    console.error(`[Courses] Error:`, error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }
 }
@@ -227,7 +181,7 @@ export async function PUT(request: NextRequest) {
 
     const check = await db.query<{ id: string }>(
       `SELECT id FROM courses WHERE id = ? AND organizationId = ?`,
-      id, user.organizationId
+      [id, user.organizationId]
     );
 
     if (check.length === 0) {
@@ -245,12 +199,12 @@ export async function PUT(request: NextRequest) {
         isActive = COALESCE(?, isActive),
         updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      name, name, code, description, duration, fee, isActive, id
+      [name, name, code, description, duration, fee, isActive, id]
     );
 
     const courses = await db.query<Course>(
       `SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE id = ?`,
-      id
+      [id]
     );
     return NextResponse.json({ course: courses[0] });
   } catch (error) {
@@ -282,7 +236,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
 
-    await db.execute(`UPDATE courses SET isActive = 0 WHERE id = ?`, id);
+    await db.execute(`UPDATE courses SET isActive = 0 WHERE id = ?`, [id]);
     return NextResponse.json({ message: 'Cours supprimé avec succès' });
   } catch (error) {
     console.error('Delete course error:', error);

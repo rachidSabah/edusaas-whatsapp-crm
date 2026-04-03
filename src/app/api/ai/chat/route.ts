@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDbContext } from '@/lib/db-context';
+import { getDbContext } from '@/lib/db-hybrid';
 import { DEFAULT_AI_CONFIG, type AIConfig } from '@/app/api/ai-config/constants';
 
 interface KnowledgeEntry {

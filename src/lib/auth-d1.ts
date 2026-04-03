@@ -25,7 +25,7 @@ export interface AuthUser {
 
 const COOKIE_NAME = 'edusaas_token';
 const PASSWORD_SALT = 'edusaas-password-salt-2024';
-const JWT_SECRET = 'edusaas-production-jwt-secret-d1-2024-super-secure';
+const JWT_SECRET = 'edusaas-production-jwt-secret-hybrid-2024-super-secure';
 
 /**
  * Get JWT secret as Uint8Array

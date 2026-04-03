@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { processIncomingMessage } from '@/lib/whatsapp';
-import { getDbContext } from '@/lib/db-context';
+import { getDbContext } from '@/lib/db-hybrid';
 
 // REQUIRED FOR CLOUDFLARE PAGES: This tells Next.js to use the Edge runtime instead of Node.js
 export const runtime = 'edge';

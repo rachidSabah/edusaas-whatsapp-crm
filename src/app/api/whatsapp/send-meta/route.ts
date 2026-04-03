@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
+import { requireAuth } from '@/lib/auth-hybrid';
 
 /**
  * Send message via Meta WhatsApp Business API v22.0

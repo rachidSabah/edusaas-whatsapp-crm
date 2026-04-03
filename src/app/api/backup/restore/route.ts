@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
+import { requireAuth } from '@/lib/auth-hybrid';
 import { restoreBackup, verifyBackup } from '@/lib/backup';
 
 // Restore from uploaded backup file

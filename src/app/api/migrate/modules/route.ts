@@ -6,8 +6,8 @@ export const runtime = 'edge';
  * This is backward compatible - only adds new tables
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 const CREATE_TABLES_SQL = [
   // Module 2: Courses

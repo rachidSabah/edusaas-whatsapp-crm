@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDbContext } from '@/lib/db-context';
+import { getDbContext } from '@/lib/db-hybrid';
 
 /**
  * Webhook endpoint for WhatsApp Business API

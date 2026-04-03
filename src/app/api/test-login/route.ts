@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { getOne } from '@/lib/db-hybrid';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
@@ -11,12 +11,7 @@ export async function POST(request: Request) {
 
     console.log('Login attempt for:', email);
 
-    const result = await db.execute({
-      sql: `SELECT * FROM users WHERE email = ?`,
-      args: [email?.toLowerCase()],
-    });
-
-    const user = result.rows[0];
+    const user = await getOne(`SELECT * FROM users WHERE email = ?`, [email?.toLowerCase()]);
     console.log('User found:', !!user);
 
     if (!user) {

@@ -105,7 +105,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    // Query user from database (D1 or Turso)
+    // Query user from database (D1)
     const user = await getOne<{
       id: string;
       email: string;
@@ -116,7 +116,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       isActive: number;
     }>(
       `SELECT id, email, name, role, organizationId, avatar, isActive FROM users WHERE id = ?`,
-      payload.userId
+      [payload.userId]
     );
 
     if (!user || user.isActive !== 1) {
@@ -232,7 +232,7 @@ export async function authenticateUser(
 ): Promise<{ user: AuthUser; token: string } | null> {
   console.log(`Authenticating user: ${email}`);
   
-  // Query user from database (D1 or Turso)
+  // Query user from database (D1)
   const user = await getOne<{
     id: string;
     email: string;
@@ -244,7 +244,7 @@ export async function authenticateUser(
     isActive: number;
   }>(
     `SELECT id, email, password, name, role, organizationId, avatar, isActive FROM users WHERE email = ?`,
-    email.toLowerCase()
+    [email.toLowerCase()]
   );
 
   console.log(`Found user: ${user ? user.email : 'none'}`);
@@ -276,7 +276,7 @@ export async function authenticateUser(
 
   // Update last login
   try {
-    await execute(`UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE id = ?`, user.id);
+    await execute(`UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
     console.log(`Updated last login for user: ${email}`);
   } catch (updateError) {
     console.warn(`Could not update last login for user ${email}:`, updateError);

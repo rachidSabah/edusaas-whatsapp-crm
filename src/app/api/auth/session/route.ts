@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth-edge';
+import { getCurrentUser } from '@/lib/auth-hybrid';
 
 export async function GET() {
   try {

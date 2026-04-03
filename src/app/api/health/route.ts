@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
-import { getDbContext } from '@/lib/db-context';
+import { getDbContext } from '@/lib/db-hybrid';
 
 export async function GET(request: NextRequest) {
   try {

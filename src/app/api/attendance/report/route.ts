@@ -1,8 +1,8 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
          WidthType, AlignmentType, BorderStyle, HeadingLevel } from 'docx';
 
