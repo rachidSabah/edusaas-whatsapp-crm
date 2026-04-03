@@ -16,7 +16,7 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "edusaas-db"
-database_id = "YOUR_D1_DATABASE_ID"  # Replace with actual ID after creating database
+database_id = "57dbf83e-7ce3-45e0-b6fa-df2f874c1ae2"
 
 # Environment variables are now managed through D1 database
 # No need for TURSO_DATABASE_URL or TURSO_AUTH_TOKEN
