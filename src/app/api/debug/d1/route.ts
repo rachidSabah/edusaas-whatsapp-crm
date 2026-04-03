@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 // Debug endpoint for D1 database connection
 import { NextResponse } from 'next/server';
-import { getDbContext } from '@/lib/db-d1';
+import { getDbContext } from '@/lib/db-hybrid';
 
 export async function GET() {
   try {

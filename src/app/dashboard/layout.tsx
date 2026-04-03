@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/auth-d1';
+import { getCurrentUser } from '@/lib/auth-hybrid';
 import { Sidebar } from '@/components/layout/sidebar';
 
 export default async function DashboardLayout({
