@@ -47,6 +47,17 @@ interface Student {
   parentPhone: string | null;
 }
 
+// Helper function to safely parse JSON
+function safeJsonParse(str: string | null, defaultValue: any = []) {
+  if (!str) return defaultValue;
+  try {
+    return JSON.parse(str);
+  } catch {
+    console.warn('Failed to parse JSON:', str);
+    return defaultValue;
+  }
+}
+
 // Get students for organization
 export async function GET(request: NextRequest) {
   try {
@@ -142,8 +153,8 @@ export async function GET(request: NextRequest) {
         disciplineNotes: row.disciplineNotes,
         incidentNotes: row.incidentNotes,
         performanceNotes: row.performanceNotes,
-        absences: row.absences ? JSON.parse(row.absences) : [],
-        retards: row.retards ? JSON.parse(row.retards) : [],
+        absences: safeJsonParse(row.absences, []),
+        retards: safeJsonParse(row.retards, []),
         avertissements: row.avertissements || 0,
         miseAPied: row.miseAPied || 0,
         parent1Name: row.parent1Name || null,
@@ -242,8 +253,8 @@ export async function GET(request: NextRequest) {
       disciplineNotes: row.disciplineNotes,
       incidentNotes: row.incidentNotes,
       performanceNotes: row.performanceNotes,
-      absences: row.absences ? JSON.parse(row.absences) : [],
-      retards: row.retards ? JSON.parse(row.retards) : [],
+      absences: safeJsonParse(row.absences, []),
+      retards: safeJsonParse(row.retards, []),
       avertissements: row.avertissements || 0,
       miseAPied: row.miseAPied || 0,
       // Parent 1 Information
@@ -548,8 +559,8 @@ export async function PUT(request: NextRequest) {
     const student = row ? {
       ...row,
       currentYear: row.currentYear || 1,
-      absences: row.absences ? JSON.parse(row.absences) : [],
-      retards: row.retards ? JSON.parse(row.retards) : [],
+      absences: safeJsonParse(row.absences, []),
+      retards: safeJsonParse(row.retards, []),
       avertissements: row.avertissements || 0,
       miseAPied: row.miseAPied || 0,
       parent1Name: row.parent1Name || null,

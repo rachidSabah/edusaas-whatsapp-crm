@@ -31,24 +31,31 @@ export async function GET(request: NextRequest) {
     const triggerAction = searchParams.get('triggerAction');
     const includeSystem = searchParams.get('includeSystem') !== 'false';
 
-    // Build SQL query - get system templates AND organization templates
-    let sql = `
-      SELECT * FROM templates 
-      WHERE (isSystem = 1 ${user.organizationId ? `OR organizationId = '${user.organizationId}'` : ''})
-      AND isActive = 1
-    `;
+    // Build SQL query with parameterized queries for security
+    let sql = `SELECT * FROM templates WHERE isActive = 1`;
+    const args: any[] = [];
+    
+    // Add organization filter
+    if (user.organizationId) {
+      sql += ` AND (isSystem = 1 OR organizationId = ?)`;
+      args.push(user.organizationId);
+    } else {
+      sql += ` AND isSystem = 1`;
+    }
     
     if (category) {
-      sql += ` AND category = '${category}'`;
+      sql += ` AND category = ?`;
+      args.push(category);
     }
     
     if (triggerAction) {
-      sql += ` AND triggerAction = '${triggerAction}'`;
+      sql += ` AND triggerAction = ?`;
+      args.push(triggerAction);
     }
 
     sql += ` ORDER BY isSystem DESC, createdAt DESC`;
 
-    const templates = await db.query<Template>(sql, []);
+    const templates = await db.query<Template>(sql, args);
 
     return NextResponse.json({ templates });
   } catch (error) {

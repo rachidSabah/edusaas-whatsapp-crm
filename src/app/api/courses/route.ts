@@ -8,6 +8,7 @@ interface Course {
   id: string;
   organizationId: string;
   name: string;
+  title?: string;
   code: string | null;
   description: string | null;
   duration: string | null;
@@ -59,12 +60,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
 
-    let sql = `SELECT * FROM courses WHERE organizationId = ? AND isActive = 1`;
+    let sql = `SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE organizationId = ? AND isActive = 1`;
     const args: any[] = [user.organizationId];
 
     if (search) {
-      sql += ` AND (name LIKE ? OR description LIKE ?)`;
-      args.push(`%${search}%`, `%${search}%`);
+      sql += ` AND (name LIKE ? OR title LIKE ? OR description LIKE ?)`;
+      args.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     sql += ` ORDER BY createdAt DESC`;
@@ -103,10 +104,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
     }
 
-    // Check for duplicate
+    // Check for duplicate (check both name and title columns for compatibility)
     const existing = await db.query<{ id: string }>(
-      `SELECT id FROM courses WHERE organizationId = ? AND name = ? AND isActive = 1`,
-      [user.organizationId, name]
+      `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
+      [user.organizationId, name, name]
     );
 
     if (existing.length > 0) {
@@ -116,10 +117,11 @@ export async function POST(request: NextRequest) {
     const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.
+    // Include both 'title' (required by old schema) and 'name' (new schema) for compatibility
     await db.execute(
-      `INSERT INTO courses (id, organizationId, name, code, description, duration, fee, isActive)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, user.organizationId, name, code || null, description || null, duration || null, fee || 0]
+      `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0]
     );
 
     // Build the course object from what we just inserted — no replica lag possible
@@ -171,6 +173,7 @@ export async function PUT(request: NextRequest) {
 
     await db.execute(
       `UPDATE courses SET 
+        title = COALESCE(?, title),
         name = COALESCE(?, name),
         code = COALESCE(?, code),
         description = COALESCE(?, description),
@@ -179,10 +182,10 @@ export async function PUT(request: NextRequest) {
         isActive = COALESCE(?, isActive),
         updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [name, code, description, duration, fee, isActive, id]
+      [name, name, code, description, duration, fee, isActive, id]
     );
 
-    const courses = await db.query<Course>(`SELECT * FROM courses WHERE id = ?`, [id]);
+    const courses = await db.query<Course>(`SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE id = ?`, [id]);
     return NextResponse.json({ course: courses[0] });
   } catch (error) {
     console.error('Update course error:', error);
