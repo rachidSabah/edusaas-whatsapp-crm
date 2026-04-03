@@ -41,6 +41,11 @@ interface BrandingSettings {
   updatedAt: string;
 }
 
+// Helper to convert undefined to null for D1 compatibility
+function nullIfUndefined(value: any): any {
+  return value === undefined ? null : value;
+}
+
 // Default branding fallback
 const DEFAULT_BRANDING: Partial<BrandingSettings> = {
   appName: 'EduSaaS',
@@ -236,13 +241,17 @@ export async function PUT(request: NextRequest) {
           updatedAt = CURRENT_TIMESTAMP
         WHERE organizationId = ?`,
         [
-          logo, logoWidth, appName, tagline, primaryColor, secondaryColor, accentColor,
-          heroTitle, heroSubtitle, heroButtonText, heroButtonLink, heroBackgroundImage, heroBackgroundGradient,
+          nullIfUndefined(logo), nullIfUndefined(logoWidth), nullIfUndefined(appName), nullIfUndefined(tagline), 
+          nullIfUndefined(primaryColor), nullIfUndefined(secondaryColor), nullIfUndefined(accentColor),
+          nullIfUndefined(heroTitle), nullIfUndefined(heroSubtitle), nullIfUndefined(heroButtonText), 
+          nullIfUndefined(heroButtonLink), nullIfUndefined(heroBackgroundImage), nullIfUndefined(heroBackgroundGradient),
           showFeatures ? 1 : 0,
-          feature1Title, feature1Description, feature1Icon,
-          feature2Title, feature2Description, feature2Icon,
-          feature3Title, feature3Description, feature3Icon,
-          footerText, facebookUrl, twitterUrl, linkedinUrl, instagramUrl, contactEmail, contactPhone, customCss,
+          nullIfUndefined(feature1Title), nullIfUndefined(feature1Description), nullIfUndefined(feature1Icon),
+          nullIfUndefined(feature2Title), nullIfUndefined(feature2Description), nullIfUndefined(feature2Icon),
+          nullIfUndefined(feature3Title), nullIfUndefined(feature3Description), nullIfUndefined(feature3Icon),
+          nullIfUndefined(footerText), nullIfUndefined(facebookUrl), nullIfUndefined(twitterUrl), 
+          nullIfUndefined(linkedinUrl), nullIfUndefined(instagramUrl), nullIfUndefined(contactEmail), 
+          nullIfUndefined(contactPhone), nullIfUndefined(customCss),
           user.organizationId
         ]
       );
@@ -259,13 +268,18 @@ export async function PUT(request: NextRequest) {
           footerText, facebookUrl, twitterUrl, linkedinUrl, instagramUrl, contactEmail, contactPhone, customCss
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          id, user.organizationId, logo, logoWidth || 40, appName, tagline, primaryColor, secondaryColor, accentColor,
-          heroTitle, heroSubtitle, heroButtonText, heroButtonLink, heroBackgroundImage, heroBackgroundGradient,
+          id, user.organizationId, nullIfUndefined(logo), nullIfUndefined(logoWidth) || 40, 
+          nullIfUndefined(appName), nullIfUndefined(tagline), nullIfUndefined(primaryColor), 
+          nullIfUndefined(secondaryColor), nullIfUndefined(accentColor),
+          nullIfUndefined(heroTitle), nullIfUndefined(heroSubtitle), nullIfUndefined(heroButtonText), 
+          nullIfUndefined(heroButtonLink), nullIfUndefined(heroBackgroundImage), nullIfUndefined(heroBackgroundGradient),
           showFeatures ? 1 : 1,
-          feature1Title, feature1Description, feature1Icon,
-          feature2Title, feature2Description, feature2Icon,
-          feature3Title, feature3Description, feature3Icon,
-          footerText, facebookUrl, twitterUrl, linkedinUrl, instagramUrl, contactEmail, contactPhone, customCss
+          nullIfUndefined(feature1Title), nullIfUndefined(feature1Description), nullIfUndefined(feature1Icon),
+          nullIfUndefined(feature2Title), nullIfUndefined(feature2Description), nullIfUndefined(feature2Icon),
+          nullIfUndefined(feature3Title), nullIfUndefined(feature3Description), nullIfUndefined(feature3Icon),
+          nullIfUndefined(footerText), nullIfUndefined(facebookUrl), nullIfUndefined(twitterUrl), 
+          nullIfUndefined(linkedinUrl), nullIfUndefined(instagramUrl), nullIfUndefined(contactEmail), 
+          nullIfUndefined(contactPhone), nullIfUndefined(customCss)
         ]
       );
     }
