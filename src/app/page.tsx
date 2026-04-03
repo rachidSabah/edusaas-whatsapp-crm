@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,33 +17,187 @@ import {
   CheckCircle,
   Zap,
   HeadphonesIcon,
-  BookOpen
+  BookOpen,
+  GraduationCap,
+  Loader2,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Instagram,
+  Mail,
+  Phone
 } from 'lucide-react';
 
+interface BrandingSettings {
+  logo: string | null;
+  logoWidth: number;
+  appName: string;
+  tagline: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroButtonText: string;
+  heroButtonLink: string;
+  heroBackgroundImage: string | null;
+  heroBackgroundGradient: string;
+  showFeatures: boolean;
+  feature1Title: string;
+  feature1Description: string;
+  feature1Icon: string;
+  feature2Title: string;
+  feature2Description: string;
+  feature2Icon: string;
+  feature3Title: string;
+  feature3Description: string;
+  feature3Icon: string;
+  footerText: string;
+  facebookUrl: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  customCss: string | null;
+}
+
+const DEFAULT_BRANDING: BrandingSettings = {
+  logo: null,
+  logoWidth: 40,
+  appName: 'EduSaaS',
+  tagline: 'Education Management Platform',
+  primaryColor: '#10b981',
+  secondaryColor: '#6366f1',
+  accentColor: '#f59e0b',
+  heroTitle: 'Transform Your Educational Institution',
+  heroSubtitle: 'Complete management solution for schools, training centers, and educational organizations',
+  heroButtonText: 'Get Started',
+  heroButtonLink: '/login',
+  heroBackgroundImage: null,
+  heroBackgroundGradient: 'from-green-600 to-emerald-700',
+  showFeatures: true,
+  feature1Title: 'Student Management',
+  feature1Description: 'Complete student lifecycle management from enrollment to graduation',
+  feature1Icon: 'GraduationCap',
+  feature2Title: 'Communication Hub',
+  feature2Description: 'Integrated WhatsApp and email communication tools',
+  feature2Icon: 'MessageSquare',
+  feature3Title: 'Analytics & Reports',
+  feature3Description: 'Comprehensive reporting and analytics dashboard',
+  feature3Icon: 'BarChart3',
+  footerText: '© 2026 EduSaaS. All rights reserved.',
+  facebookUrl: null,
+  twitterUrl: null,
+  linkedinUrl: null,
+  instagramUrl: null,
+  contactEmail: null,
+  contactPhone: null,
+  customCss: null,
+};
+
+// Icon mapping
+const iconMap: Record<string, any> = {
+  GraduationCap,
+  MessageSquare,
+  BarChart3,
+  Users,
+  Calendar,
+  Bot,
+  BookOpen,
+  HeadphonesIcon,
+  Globe,
+  Shield,
+  Smartphone,
+};
+
 export default function LandingPage() {
+  const [branding, setBranding] = useState<BrandingSettings>(DEFAULT_BRANDING);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBranding = async () => {
+      try {
+        const response = await fetch('/api/branding');
+        const data = await response.json();
+        if (data.branding) {
+          setBranding({ ...DEFAULT_BRANDING, ...data.branding });
+        }
+      } catch (error) {
+        console.error('Failed to fetch branding:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBranding();
+  }, []);
+
+  // Get icon component
+  const getIcon = (iconName: string) => {
+    return iconMap[iconName] || MessageSquare;
+  };
+
+  // Parse gradient classes
+  const getGradientClass = (gradient: string) => {
+    if (gradient.includes('from-')) {
+      return gradient;
+    }
+    return `from-[${branding.primaryColor}] to-[${branding.secondaryColor}]`;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: branding.primaryColor }} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Custom CSS */}
+      {branding.customCss && (
+        <style dangerouslySetInnerHTML={{ __html: branding.customCss }} />
+      )}
+
       {/* Header */}
       <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-slate-800">EduSaaS</span>
+            {branding.logo ? (
+              <img
+                src={branding.logo}
+                alt={branding.appName}
+                style={{ maxWidth: branding.logoWidth, maxHeight: 40 }}
+                className="rounded"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})` }}
+              >
+                <MessageSquare className="w-6 h-6 text-white" />
+              </div>
+            )}
+            <span className="text-xl font-bold text-slate-800">{branding.appName}</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="#features" className="text-slate-600 hover:text-slate-900 transition">Fonctionnalités</Link>
-            <Link href="#pricing" className="text-slate-600 hover:text-slate-900 transition">Tarifs</Link>
+            <Link href="#features" className="text-slate-600 hover:text-slate-900 transition">Features</Link>
+            <Link href="#pricing" className="text-slate-600 hover:text-slate-900 transition">Pricing</Link>
             <Link href="#contact" className="text-slate-600 hover:text-slate-900 transition">Contact</Link>
           </nav>
           <div className="flex items-center gap-4">
             <Link href="/login">
-              <Button variant="ghost">Connexion</Button>
+              <Button variant="ghost">Login</Button>
             </Link>
             <Link href="/register">
-              <Button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700">
-                Essai Gratuit
+              <Button
+                className="hover:opacity-90"
+                style={{
+                  background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
+                }}
+              >
+                Free Trial
               </Button>
             </Link>
           </div>
@@ -50,34 +207,41 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center">
-          <Badge className="mb-6 bg-green-100 text-green-700 hover:bg-green-100">
+          <Badge
+            className="mb-6"
+            style={{
+              backgroundColor: `${branding.primaryColor}20`,
+              color: branding.primaryColor
+            }}
+          >
             <Zap className="w-3 h-3 mr-1" />
-            Nouveau: Intégration WhatsApp IA
+            {branding.tagline}
           </Badge>
           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-            Gestion Scolaire Intelligente<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-600">
-              Propulsée par WhatsApp & IA
-            </span>
+            {branding.heroTitle}
           </h1>
           <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
-            CRM WhatsApp multi-tenant avec réponses automatiques IA, gestion des étudiants, 
-            suivi des présences et notifications automatiques aux parents. 
-            La solution complète pour les écoles et académies.
+            {branding.heroSubtitle}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
-              <Button size="lg" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-8">
-                Commencer Gratuitement
+            <Link href={branding.heroButtonLink || '/register'}>
+              <Button
+                size="lg"
+                className="px-8 hover:opacity-90"
+                style={{
+                  background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
+                }}
+              >
+                {branding.heroButtonText}
               </Button>
             </Link>
             <Link href="#demo">
               <Button size="lg" variant="outline" className="px-8">
-                Voir la Démo
+                See Demo
               </Button>
             </Link>
           </div>
-          <p className="text-sm text-slate-500 mt-4">Essai gratuit de 14 jours • Aucune carte requise</p>
+          <p className="text-sm text-slate-500 mt-4">14-day free trial • No credit card required</p>
         </div>
 
         {/* Hero Image/Dashboard Preview */}
@@ -91,7 +255,7 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-green-400"></div>
                 </div>
                 <div className="flex-1 text-center">
-                  <span className="text-slate-400 text-sm">dashboard.edusaas.app</span>
+                  <span className="text-slate-400 text-sm">dashboard.{branding.appName.toLowerCase().replace(/\s/g, '')}.app</span>
                 </div>
               </div>
               <div className="p-6 bg-slate-50">
@@ -101,19 +265,19 @@ export default function LandingPage() {
                       <div className="h-6 bg-slate-200 rounded w-3/4"></div>
                       <div className="h-4 bg-slate-100 rounded w-full"></div>
                       <div className="h-4 bg-slate-100 rounded w-full"></div>
-                      <div className="h-4 bg-green-200 rounded w-full"></div>
+                      <div className="h-4 rounded w-full" style={{ backgroundColor: `${branding.primaryColor}40` }}></div>
                       <div className="h-4 bg-slate-100 rounded w-full"></div>
                     </div>
                   </div>
                   <div className="col-span-3 space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { title: 'Conversations', value: '156', color: 'bg-green-500' },
-                        { title: 'Étudiants', value: '342', color: 'bg-blue-500' },
-                        { title: 'Taux Présence', value: '94%', color: 'bg-purple-500' }
+                        { title: 'Conversations', value: '156', color: branding.primaryColor },
+                        { title: 'Students', value: '342', color: branding.secondaryColor },
+                        { title: 'Attendance', value: '94%', color: branding.accentColor }
                       ].map((stat, i) => (
                         <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
-                          <div className={`w-2 h-2 ${stat.color} rounded-full mb-2`}></div>
+                          <div className={`w-2 h-2 rounded-full mb-2`} style={{ backgroundColor: stat.color }}></div>
                           <div className="text-2xl font-bold text-slate-800">{stat.value}</div>
                           <div className="text-sm text-slate-500">{stat.title}</div>
                         </div>
@@ -122,7 +286,7 @@ export default function LandingPage() {
                     <div className="bg-white rounded-lg p-4 shadow-sm">
                       <div className="flex justify-between items-center mb-4">
                         <div className="h-4 bg-slate-200 rounded w-1/4"></div>
-                        <div className="h-6 bg-green-100 rounded-full w-20"></div>
+                        <div className="h-6 rounded-full w-20" style={{ backgroundColor: `${branding.primaryColor}30` }}></div>
                       </div>
                       <div className="space-y-3">
                         {[1, 2, 3].map((_, i) => (
@@ -132,7 +296,7 @@ export default function LandingPage() {
                               <div className="h-3 bg-slate-200 rounded w-1/3 mb-1"></div>
                               <div className="h-2 bg-slate-100 rounded w-2/3"></div>
                             </div>
-                            <div className="h-6 bg-green-100 rounded w-16"></div>
+                            <div className="h-6 rounded w-16" style={{ backgroundColor: `${branding.primaryColor}20` }}></div>
                           </div>
                         ))}
                       </div>
@@ -146,121 +310,67 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 bg-white">
-        <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Une Solution Complète pour Votre Établissement
-            </h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-              Tout ce dont vous avez besoin pour gérer votre école, communiquer avec les parents 
-              et automatiser vos réponses WhatsApp.
-            </p>
-          </div>
+      {branding.showFeatures && (
+        <section id="features" className="py-20 px-4 bg-white">
+          <div className="container mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                Complete Solution for Your Institution
+              </h2>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                Everything you need to manage your school, communicate with parents, and automate responses.
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                icon: MessageSquare,
-                title: 'CRM WhatsApp',
-                description: 'Gérez tous vos contacts WhatsApp, suivez les conversations et classez vos prospects automatiquement.',
-                color: 'text-green-600 bg-green-50'
-              },
-              {
-                icon: Bot,
-                title: 'Réponses IA Automatiques',
-                description: 'Notre IA répond automatiquement aux questions d\'inscription, tarifs et horaires grâce à votre base de connaissances.',
-                color: 'text-blue-600 bg-blue-50'
-              },
-              {
-                icon: Users,
-                title: 'Gestion des Étudiants',
-                description: 'Fiche complète pour chaque étudiant: informations, groupe, parents, documents et historique.',
-                color: 'text-purple-600 bg-purple-50'
-              },
-              {
-                icon: Calendar,
-                title: 'Suivi des Présences',
-                description: 'Marquez les présences par groupe, envoyez automatiquement des notifications aux parents en cas d\'absence.',
-                color: 'text-orange-600 bg-orange-50'
-              },
-              {
-                icon: BookOpen,
-                title: 'Base de Connaissances IA',
-                description: 'Enseignez à l\'IA les réponses spécifiques à votre établissement: tarifs, programmes, politiques.',
-                color: 'text-pink-600 bg-pink-50'
-              },
-              {
-                icon: HeadphonesIcon,
-                title: 'Boîte de Réception Unifiée',
-                description: 'Toutes les conversations WhatsApp centralisées avec transfert vers un conseiller humain si nécessaire.',
-                color: 'text-cyan-600 bg-cyan-50'
-              }
-            ].map((feature, i) => (
-              <Card key={i} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardHeader>
-                  <div className={`w-12 h-12 rounded-xl ${feature.color} flex items-center justify-center mb-4`}>
-                    <feature.icon className="w-6 h-6" />
-                  </div>
-                  <CardTitle className="text-xl">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-slate-600 text-base">{feature.description}</CardDescription>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  title: branding.feature1Title,
+                  description: branding.feature1Description,
+                  icon: getIcon(branding.feature1Icon),
+                  color: branding.primaryColor
+                },
+                {
+                  title: branding.feature2Title,
+                  description: branding.feature2Description,
+                  icon: getIcon(branding.feature2Icon),
+                  color: branding.secondaryColor
+                },
+                {
+                  title: branding.feature3Title,
+                  description: branding.feature3Description,
+                  icon: getIcon(branding.feature3Icon),
+                  color: branding.accentColor
+                }
+              ].map((feature, i) => (
+                <Card key={i} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardHeader>
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
+                      style={{ backgroundColor: `${feature.color}15` }}
+                    >
+                      <feature.icon className="w-6 h-6" style={{ color: feature.color }} />
+                    </div>
+                    <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-slate-600 text-base">{feature.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20 px-4 bg-slate-50">
-        <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Comment ça fonctionne
-            </h2>
-            <p className="text-lg text-slate-600">En 3 étapes simples</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: '1',
-                title: 'Connectez WhatsApp',
-                description: 'Scannez le QR code avec votre téléphone WhatsApp pour connecter votre compte en toute sécurité.'
-              },
-              {
-                step: '2',
-                title: 'Configurez votre IA',
-                description: 'Ajoutez vos formations, tarifs, horaires à la base de connaissances pour des réponses personnalisées.'
-              },
-              {
-                step: '3',
-                title: 'Gérez tout',
-                description: 'Les réponses automatiques, les étudiants, les présences et les notifications parents sont gérés automatiquement.'
-              }
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6">
-                  {item.step}
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">{item.title}</h3>
-                <p className="text-slate-600">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 bg-white">
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Tarifs Transparents
+              Transparent Pricing
             </h2>
-            <p className="text-lg text-slate-600">Choisissez le plan adapté à votre établissement</p>
+            <p className="text-lg text-slate-600">Choose the plan that fits your institution</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -268,53 +378,36 @@ export default function LandingPage() {
               {
                 name: 'Starter',
                 price: '299',
-                period: '/mois',
-                description: 'Idéal pour les petites académies',
-                features: [
-                  '100 étudiants',
-                  '3 utilisateurs',
-                  '500 messages IA/jour',
-                  '10 templates',
-                  'Support email'
-                ],
+                period: '/month',
+                description: 'Ideal for small academies',
+                features: ['100 students', '3 users', '500 AI messages/day', '10 templates', 'Email support'],
                 popular: false
               },
               {
-                name: 'Professionnel',
+                name: 'Professional',
                 price: '799',
-                period: '/mois',
-                description: 'Pour les écoles en croissance',
-                features: [
-                  '500 étudiants',
-                  '10 utilisateurs',
-                  '2000 messages IA/jour',
-                  '50 templates',
-                  'Support prioritaire',
-                  'Rapports avancés'
-                ],
+                period: '/month',
+                description: 'For growing schools',
+                features: ['500 students', '10 users', '2000 AI messages/day', '50 templates', 'Priority support', 'Advanced reports'],
                 popular: true
               },
               {
-                name: 'Entreprise',
+                name: 'Enterprise',
                 price: '1999',
-                period: '/mois',
-                description: 'Pour les grandes institutions',
-                features: [
-                  'Étudiants illimités',
-                  'Utilisateurs illimités',
-                  '10000 messages IA/jour',
-                  'Templates illimités',
-                  'Support dédié',
-                  'API access',
-                  'Formation incluse'
-                ],
+                period: '/month',
+                description: 'For large institutions',
+                features: ['Unlimited students', 'Unlimited users', '10000 AI messages/day', 'Unlimited templates', 'Dedicated support', 'API access', 'Training included'],
                 popular: false
               }
             ].map((plan, i) => (
-              <Card key={i} className={`relative ${plan.popular ? 'border-2 border-green-500 shadow-xl' : 'border shadow-lg'}`}>
+              <Card
+                key={i}
+                className={`relative ${plan.popular ? 'border-2 shadow-xl' : 'border shadow-lg'}`}
+                style={plan.popular ? { borderColor: branding.primaryColor } : {}}
+              >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-green-500 text-white">Plus Populaire</Badge>
+                    <Badge style={{ backgroundColor: branding.primaryColor }} className="text-white">Most Popular</Badge>
                   </div>
                 )}
                 <CardHeader className="text-center pt-8">
@@ -329,14 +422,20 @@ export default function LandingPage() {
                   <ul className="space-y-3 mb-6">
                     {plan.features.map((feature, j) => (
                       <li key={j} className="flex items-center gap-2 text-slate-600">
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: branding.primaryColor }} />
                         {feature}
                       </li>
                     ))}
                   </ul>
                   <Link href="/register" className="block">
-                    <Button className={`w-full ${plan.popular ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700' : ''}`} variant={plan.popular ? 'default' : 'outline'}>
-                      Commencer
+                    <Button
+                      className="w-full hover:opacity-90"
+                      variant={plan.popular ? 'default' : 'outline'}
+                      style={plan.popular ? {
+                        background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
+                      } : {}}
+                    >
+                      Get Started
                     </Button>
                   </Link>
                 </CardContent>
@@ -352,34 +451,18 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Pourquoi choisir EduSaaS?
+                Why choose {branding.appName}?
               </h2>
               <div className="space-y-6">
                 {[
-                  {
-                    icon: Globe,
-                    title: 'Multi-Tenant',
-                    description: 'Chaque organisation dispose de son espace isolé avec ses propres données, utilisateurs et configuration.'
-                  },
-                  {
-                    icon: Shield,
-                    title: 'Sécurité Avancée',
-                    description: 'Authentification sécurisée, chiffrement des données et conformité RGPD pour protéger vos informations.'
-                  },
-                  {
-                    icon: Smartphone,
-                    title: 'Sans API WhatsApp Business',
-                    description: 'Connectez votre WhatsApp personnel directement, sans frais de l\'API Business.'
-                  },
-                  {
-                    icon: BarChart3,
-                    title: 'Analytics Complets',
-                    description: 'Suivez les conversations, taux de réponse, présence et performances en temps réel.'
-                  }
+                  { icon: Globe, title: 'Multi-Tenant', description: 'Each organization has its own isolated space with data, users, and configuration.' },
+                  { icon: Shield, title: 'Advanced Security', description: 'Secure authentication, data encryption, and GDPR compliance.' },
+                  { icon: Smartphone, title: 'No WhatsApp Business API', description: 'Connect your personal WhatsApp directly, without Business API fees.' },
+                  { icon: BarChart3, title: 'Complete Analytics', description: 'Track conversations, response rates, attendance, and performance in real-time.' }
                 ].map((item, i) => (
                   <div key={i} className="flex gap-4">
                     <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <item.icon className="w-6 h-6 text-green-400" />
+                      <item.icon className="w-6 h-6" style={{ color: branding.primaryColor }} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
@@ -389,14 +472,17 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-8 text-center">
-              <h3 className="text-2xl font-bold mb-4">Prêt à démarrer?</h3>
+            <div
+              className="rounded-2xl p-8 text-center"
+              style={{ background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})` }}
+            >
+              <h3 className="text-2xl font-bold mb-4">Ready to start?</h3>
               <p className="mb-6 text-white/90">
-                Rejoignez Infohas Academy et d'autres écoles qui font confiance à EduSaaS.
+                Join schools that trust {branding.appName} for their education management.
               </p>
               <Link href="/register">
-                <Button size="lg" variant="secondary" className="bg-white text-green-600 hover:bg-slate-100">
-                  Créer mon compte gratuit
+                <Button size="lg" variant="secondary" className="bg-white hover:bg-slate-100" style={{ color: branding.primaryColor }}>
+                  Create Free Account
                 </Button>
               </Link>
             </div>
@@ -410,20 +496,30 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                  <MessageSquare className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">EduSaaS</span>
+                {branding.logo ? (
+                  <img
+                    src={branding.logo}
+                    alt={branding.appName}
+                    style={{ maxWidth: branding.logoWidth, maxHeight: 40 }}
+                    className="rounded"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})` }}
+                  >
+                    <MessageSquare className="w-6 h-6 text-white" />
+                  </div>
+                )}
+                <span className="text-xl font-bold text-white">{branding.appName}</span>
               </div>
-              <p className="text-sm">
-                Solution CRM WhatsApp IA pour écoles et académies au Maroc.
-              </p>
+              <p className="text-sm">{branding.tagline}</p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Produit</h4>
+              <h4 className="font-semibold text-white mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="#features" className="hover:text-white transition">Fonctionnalités</Link></li>
-                <li><Link href="#pricing" className="hover:text-white transition">Tarifs</Link></li>
+                <li><Link href="#features" className="hover:text-white transition">Features</Link></li>
+                <li><Link href="#pricing" className="hover:text-white transition">Pricing</Link></li>
                 <li><Link href="#" className="hover:text-white transition">API</Link></li>
               </ul>
             </div>
@@ -431,24 +527,55 @@ export default function LandingPage() {
               <h4 className="font-semibold text-white mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="#" className="hover:text-white transition">Documentation</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Centre d'aide</Link></li>
+                <li><Link href="#" className="hover:text-white transition">Help Center</Link></li>
                 <li><Link href="#" className="hover:text-white transition">Contact</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Contact</h4>
-              <ul className="space-y-2 text-sm">
-                <li>contact@edusaas.ma</li>
-                <li>+212 5XX XXX XXX</li>
-                <li>Rabat, Maroc</li>
+              <ul className="space-y-3 text-sm">
+                {branding.contactEmail && (
+                  <li className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" style={{ color: branding.primaryColor }} />
+                    {branding.contactEmail}
+                  </li>
+                )}
+                {branding.contactPhone && (
+                  <li className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" style={{ color: branding.primaryColor }} />
+                    {branding.contactPhone}
+                  </li>
+                )}
+                <li className="flex gap-3 pt-2">
+                  {branding.facebookUrl && (
+                    <a href={branding.facebookUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                      <Facebook className="w-5 h-5" />
+                    </a>
+                  )}
+                  {branding.twitterUrl && (
+                    <a href={branding.twitterUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                      <Twitter className="w-5 h-5" />
+                    </a>
+                  )}
+                  {branding.linkedinUrl && (
+                    <a href={branding.linkedinUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                      <Linkedin className="w-5 h-5" />
+                    </a>
+                  )}
+                  {branding.instagramUrl && (
+                    <a href={branding.instagramUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                      <Instagram className="w-5 h-5" />
+                    </a>
+                  )}
+                </li>
               </ul>
             </div>
           </div>
           <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
-            <p>&copy; 2024 EduSaaS. Tous droits réservés.</p>
+            <p>{branding.footerText}</p>
             <div className="flex gap-6 mt-4 md:mt-0">
-              <Link href="#" className="hover:text-white transition">Politique de confidentialité</Link>
-              <Link href="#" className="hover:text-white transition">Conditions d'utilisation</Link>
+              <Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
             </div>
           </div>
         </div>

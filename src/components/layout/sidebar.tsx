@@ -48,6 +48,7 @@ import {
   Brain,
   Webhook,
   Phone,
+  Palette,
 } from 'lucide-react';
 
 const menuItems = [
@@ -82,6 +83,7 @@ const menuItems = [
 // Role-specific menu items
 const adminMenuItems = [
   { href: '/dashboard/admin', label: 'Administration', icon: Shield, roles: ['SUPER_ADMIN', 'ORG_ADMIN', 'SCHOOL_MANAGER'] },
+  { href: '/dashboard/settings/branding', label: 'Personnalisation', icon: Palette, roles: ['SUPER_ADMIN', 'ORG_ADMIN', 'SCHOOL_MANAGER'] },
   { href: '/dashboard/assignments', label: 'Tâches & Assignations', icon: ClipboardCheck, roles: ['SUPER_ADMIN', 'ORG_ADMIN', 'SCHOOL_MANAGER'] },
 ];
 
