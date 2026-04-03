@@ -1,12 +1,8 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
-
-// Hardcoded fallback credentials for Cloudflare Pages deployment
-const FALLBACK_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1ODQwNTQsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 interface Course {
   id: string;
@@ -44,7 +40,7 @@ export async function GET(request: NextRequest) {
     // Verify organization exists
     const orgCheck = await db.query<{ id: string }>(
       `SELECT id FROM organizations WHERE id = ?`,
-      [user.organizationId]
+      user.organizationId
     );
     
     if (orgCheck.length === 0) {
@@ -65,7 +61,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
 
     let sql = `SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE organizationId = ? AND isActive = 1`;
-    const args: any[] = [user.organizationId];
+    const args: unknown[] = [user.organizationId];
 
     if (search) {
       sql += ` AND (name LIKE ? OR title LIKE ? OR description LIKE ?)`;
@@ -74,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     sql += ` ORDER BY createdAt DESC`;
 
-    const courses = await db.query<Course>(sql, args);
+    const courses = await db.query<Course>(sql, ...args);
     return NextResponse.json({ courses }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -87,14 +83,17 @@ export async function GET(request: NextRequest) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 
 // Create course
 export async function POST(request: NextRequest) {
   const requestId = `course_${Date.now()}`;
-  console.log(`[${requestId}] === CREATE COURSE START ===`);
+  console.log(`[${requestId}] === CREATE COURSE START (Hybrid) ===`);
   
   try {
     // Step 1: Authenticate user
@@ -150,7 +149,7 @@ export async function POST(request: NextRequest) {
     try {
       existing = await db.query<{ id: string }>(
         `SELECT id FROM courses WHERE organizationId = ? AND (name = ? OR title = ?) AND isActive = 1`,
-        [user.organizationId, name, name]
+        user.organizationId, name, name
       );
       console.log(`[${requestId}] Duplicate check result: ${existing.length} existing courses`);
     } catch (dupCheckError) {
@@ -175,7 +174,7 @@ export async function POST(request: NextRequest) {
       await db.execute(
         `INSERT INTO courses (id, organizationId, title, name, code, description, duration, fee, isActive)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0]
+        id, user.organizationId, name, name, code || null, description || null, duration || null, fee || 0
       );
       console.log(`[${requestId}] Course inserted successfully`);
     } catch (insertError) {
@@ -187,7 +186,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Build the course object from what we just inserted — no replica lag possible
+    // Build the course object from what we just inserted
     const course: Course = {
       id,
       organizationId: user.organizationId,
@@ -228,7 +227,7 @@ export async function PUT(request: NextRequest) {
 
     const check = await db.query<{ id: string }>(
       `SELECT id FROM courses WHERE id = ? AND organizationId = ?`,
-      [id, user.organizationId]
+      id, user.organizationId
     );
 
     if (check.length === 0) {
@@ -246,17 +245,23 @@ export async function PUT(request: NextRequest) {
         isActive = COALESCE(?, isActive),
         updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [name, name, code, description, duration, fee, isActive, id]
+      name, name, code, description, duration, fee, isActive, id
     );
 
-    const courses = await db.query<Course>(`SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE id = ?`, [id]);
+    const courses = await db.query<Course>(
+      `SELECT id, organizationId, COALESCE(name, title) as name, title, code, description, duration, fee, isActive, createdAt, updatedAt FROM courses WHERE id = ?`,
+      id
+    );
     return NextResponse.json({ course: courses[0] });
   } catch (error) {
     console.error('Update course error:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 
@@ -277,13 +282,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
 
-    await db.execute(`UPDATE courses SET isActive = 0 WHERE id = ?`, [id]);
+    await db.execute(`UPDATE courses SET isActive = 0 WHERE id = ?`, id);
     return NextResponse.json({ message: 'Cours supprimé avec succès' });
   } catch (error) {
     console.error('Delete course error:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }

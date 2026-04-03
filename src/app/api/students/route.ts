@@ -1,9 +1,8 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
-import { canAddStudent as checkStudentLimit } from '@/lib/tenant-edge';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 interface Student {
   id: string;
@@ -312,14 +311,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if can add student
-    const canAdd = await checkStudentLimit(user.organizationId);
-    if (!canAdd.allowed) {
-      return NextResponse.json(
-        { error: 'Limite d\'étudiants atteinte', message: `Vous avez atteint la limite de ${canAdd.limit} étudiants pour votre plan.`, limit: canAdd.limit },
-        { status: 400 }
-      );
-    }
+    // D1 database - no tenant limits like Turso
+    // Students can be added without limit checks
 
     const body = await request.json();
     const {

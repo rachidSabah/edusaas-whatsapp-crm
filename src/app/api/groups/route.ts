@@ -1,12 +1,8 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-edge';
-import { getDbContext } from '@/lib/db-context';
-
-// Hardcoded fallback credentials for Cloudflare Pages deployment
-const FALLBACK_TURSO_URL = 'libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io';
-const FALLBACK_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzM1ODQwNTQsImlkIjoiMDE5Y2QzY2MtN2YwMS03ODZjLTljMTctNDgzNjRiZmQyNmY4IiwicmlkIjoiNDRhZjk3NDYtZWQ1YS00ZTUyLWE5MDMtNTlmOTE0YWRiYjFkIn0.jrNADBvhQKy2_2QB-8H7qXaAS4FRMDa2tlXCQijVJ72RLdbkrddy6tAcTSNy5_JekQPA3oMLcqORMjI-1kR3DA';
+import { requireAuth } from '@/lib/auth-hybrid';
+import { getDbContext } from '@/lib/db-hybrid';
 
 interface Group {
   id: string;
@@ -50,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Verify organization exists
     const orgCheck = await db.query<{ id: string }>(
       `SELECT id FROM organizations WHERE id = ?`,
-      [user.organizationId]
+      user.organizationId
     );
     
     if (orgCheck.length === 0) {
@@ -76,7 +72,7 @@ export async function GET(request: NextRequest) {
             LEFT JOIN users u ON g.teacherId = u.id
             WHERE g.organizationId = ?
             ORDER BY g.createdAt DESC`,
-      [user.organizationId]
+      user.organizationId
     );
 
     const groups = rows.map(row => ({
@@ -107,7 +103,7 @@ export async function GET(request: NextRequest) {
 // Create group
 export async function POST(request: NextRequest) {
   const requestId = `group_${Date.now()}`;
-  console.log(`[${requestId}] === CREATE GROUP START ===`);
+  console.log(`[${requestId}] === CREATE GROUP START (Hybrid) ===`);
   
   try {
     // Step 1: Authenticate user
@@ -178,7 +174,7 @@ export async function POST(request: NextRequest) {
     try {
       existing = await db.query<{ id: string }>(
         `SELECT id FROM groups WHERE organizationId = ? AND name = ?`,
-        [user.organizationId, name]
+        user.organizationId, name
       );
       console.log(`[${requestId}] Duplicate check result: ${existing.length} existing groups`);
     } catch (dupCheckError) {
@@ -206,16 +202,7 @@ export async function POST(request: NextRequest) {
       await db.execute(
         `INSERT INTO groups (id, organizationId, name, code, description, schedule, teacherId, capacity)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          user.organizationId,
-          name,
-          code || null,
-          description || null,
-          schedule || null,
-          teacherId || null,
-          capacity || null,
-        ]
+        id, user.organizationId, name, code || null, description || null, schedule || null, teacherId || null, capacity || null
       );
       console.log(`[${requestId}] Group inserted successfully`);
     } catch (insertError) {
@@ -230,7 +217,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build the group object from what we just inserted — no need to query back
+    // Build the group object from what we just inserted
     const group: Group = {
       id,
       organizationId: user.organizationId,
@@ -297,7 +284,7 @@ export async function PUT(request: NextRequest) {
     // Verify group belongs to organization
     const check = await db.query<{ id: string }>(
       `SELECT id FROM groups WHERE id = ? AND organizationId = ?`,
-      [id, user.organizationId]
+      id, user.organizationId
     );
 
     if (check.length === 0) {
@@ -322,8 +309,8 @@ export async function PUT(request: NextRequest) {
             currentYear = COALESCE(?, currentYear),
             updatedAt = CURRENT_TIMESTAMP
             WHERE id = ?`,
-      [name, code, description, schedule, teacherId, capacity, 
-       year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear, id]
+      name, code, description, schedule, teacherId, capacity, 
+      year1StartDate, year1EndDate, year2StartDate, year2EndDate, currentYear, id
     );
 
     // Fetch updated group
@@ -332,7 +319,7 @@ export async function PUT(request: NextRequest) {
             FROM groups g
             LEFT JOIN users u ON g.teacherId = u.id
             WHERE g.id = ?`,
-      [id]
+      id
     );
 
     const group = result[0];
@@ -373,7 +360,7 @@ export async function DELETE(request: NextRequest) {
     // Verify group belongs to organization
     const check = await db.query<{ id: string }>(
       `SELECT id FROM groups WHERE id = ? AND organizationId = ?`,
-      [id, user.organizationId]
+      id, user.organizationId
     );
 
     if (check.length === 0) {
@@ -383,7 +370,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await db.execute(`DELETE FROM groups WHERE id = ?`, [id]);
+    await db.execute(`DELETE FROM groups WHERE id = ?`, id);
 
     return NextResponse.json({ message: 'Group deleted successfully' });
   } catch (error) {

@@ -1,4 +1,4 @@
-# Cloudflare Pages Configuration for Next.js
+# Cloudflare Pages Configuration for Next.js with D1 Database
 # This file configures the deployment for @cloudflare/next-on-pages
 
 name = "edusaas-whatsapp-crm"
@@ -8,12 +8,19 @@ compatibility_flags = ["nodejs_compat"]
 # Build output directory - required for @cloudflare/next-on-pages
 pages_build_output_dir = ".vercel/output/static"
 
-# Environment variables MUST be configured in Cloudflare Dashboard:
+# D1 Database binding
+# Run these commands to create the database:
+# wrangler d1 create edusaas-db
+# Then copy the database_id below
+
+[[d1_databases]]
+binding = "DB"
+database_name = "edusaas-db"
+database_id = "YOUR_D1_DATABASE_ID"  # Replace with actual ID after creating database
+
+# Environment variables are now managed through D1 database
+# No need for TURSO_DATABASE_URL or TURSO_AUTH_TOKEN
+
+# JWT_SECRET can be set in Cloudflare Dashboard if needed
 # Go to: Pages > edusaas-whatsapp-crm > Settings > Environment variables
-#
-# Required variables:
-# - TURSO_DATABASE_URL: libsql://edusaas-rachidelsabah.aws-eu-west-1.turso.io
-# - TURSO_AUTH_TOKEN: Your Turso authentication token (get from https://turso.tech/app)
-# - JWT_SECRET: Secret key for JWT signing (optional, has development fallback)
-#
-# These variables are accessible in edge functions via getRequestContext().env
+# Optional: JWT_SECRET - for custom JWT signing key
