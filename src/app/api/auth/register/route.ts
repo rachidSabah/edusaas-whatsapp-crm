@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as { email?: string; password?: string; name?: string; organizationName?: string; organizationSlug?: string };
     const { email, password, name, organizationName, organizationSlug } = body;
 
     if (!email || !password || !name) {

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as { studentId?: string; groupId?: string; date?: string; status?: string; notes?: string };
     const { studentId, groupId, date, status, notes } = body;
 
     if (!studentId || !date || !status) {
@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as { id?: string; status?: string; notes?: string };
     const { id, status, notes } = body;
 
     if (!id || !status) {

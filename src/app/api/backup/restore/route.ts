@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as { backupData?: unknown; overwrite?: boolean; tables?: string[] };
     const { backupData, overwrite = false, tables } = body;
 
     if (!backupData) {

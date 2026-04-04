@@ -214,7 +214,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const db = getDbContext();
-    const body = await request.json();
+    const body = await request.json() as Partial<BrandingSettings>;
 
     // Extract branding fields
     const {

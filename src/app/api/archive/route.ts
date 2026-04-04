@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No organization associated' }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as { studentIds?: string[]; graduationDate?: string };
     const { studentIds, graduationDate } = body;
 
     if (!Array.isArray(studentIds) || studentIds.length === 0) {

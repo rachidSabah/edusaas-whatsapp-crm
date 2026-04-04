@@ -69,7 +69,14 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth();
     const db = getDbContext();
 
-    const body = await request.json();
+    const body = await request.json() as {
+      name?: string;
+      email?: string;
+      phone?: string;
+      role?: string;
+      password?: string;
+      organizationId?: string;
+    };
     const { name, email, phone, role, password, organizationId } = body;
 
     if (!name || !email || !role) {
@@ -126,7 +133,15 @@ export async function PUT(request: NextRequest) {
     const user = await requireAuth();
     const db = getDbContext();
 
-    const body = await request.json();
+    const body = await request.json() as {
+      id?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      role?: string;
+      isActive?: number;
+      password?: string;
+    };
     const { id, name, email, phone, role, isActive, password } = body;
 
     if (!id) {

@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => ({})) as { type?: string };
     const { type = 'full' } = body;
 
     // Create backup_history table if not exists

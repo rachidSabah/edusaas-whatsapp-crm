@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No organization associated' }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as { name?: string; startDate?: string; endDate?: string };
     const { name, startDate, endDate } = body;
 
     if (!name || !startDate || !endDate) {
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No organization associated' }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as { id?: string; name?: string; startDate?: string; endDate?: string; isActive?: number };
     const { id, name, startDate, endDate, isActive } = body;
 
     const check = await db.query<{ id: string }>(
