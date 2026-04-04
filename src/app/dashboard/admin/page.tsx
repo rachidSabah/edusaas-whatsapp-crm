@@ -44,6 +44,7 @@ import {
   GraduationCap,
   AlertCircle,
   CheckCircle,
+  Key,
 } from 'lucide-react';
 import { USER_ROLES, ROLE_LABELS, USER_STATUS, USER_STATUS_LABELS } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -82,6 +83,13 @@ export default function AdminDashboardPage() {
   const [editingItem, setEditingItem] = useState<User | Teacher | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Password reset state
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [resetPasswordData, setResetPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [resetPasswordSaving, setResetPasswordSaving] = useState(false);
+  const [resetPasswordMessage, setResetPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -215,6 +223,63 @@ export default function AdminDashboardPage() {
         : 'ACTIVE',
     });
     setDialogOpen(true);
+  };
+
+  // Handle reset password
+  const handleOpenResetPassword = (user: User) => {
+    setResetPasswordUser(user);
+    setResetPasswordData({ newPassword: '', confirmPassword: '' });
+    setResetPasswordMessage(null);
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser) return;
+    
+    if (!resetPasswordData.newPassword || !resetPasswordData.confirmPassword) {
+      setResetPasswordMessage({ type: 'error', text: 'Veuillez remplir tous les champs' });
+      return;
+    }
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      setResetPasswordMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas' });
+      return;
+    }
+    if (resetPasswordData.newPassword.length < 6) {
+      setResetPasswordMessage({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' });
+      return;
+    }
+    
+    setResetPasswordSaving(true);
+    setResetPasswordMessage(null);
+    
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: resetPasswordUser.id,
+          password: resetPasswordData.newPassword,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setResetPasswordMessage({ type: 'success', text: 'Mot de passe réinitialisé avec succès!' });
+        setTimeout(() => {
+          setResetPasswordDialogOpen(false);
+          setResetPasswordUser(null);
+          setResetPasswordData({ newPassword: '', confirmPassword: '' });
+          setResetPasswordMessage(null);
+        }, 1500);
+      } else {
+        setResetPasswordMessage({ type: 'error', text: data.error || 'Erreur lors de la réinitialisation' });
+      }
+    } catch (error) {
+      setResetPasswordMessage({ type: 'error', text: 'Erreur de connexion' });
+    } finally {
+      setResetPasswordSaving(false);
+    }
   };
 
   const filteredUsers = users.filter(u => 
@@ -463,10 +528,11 @@ export default function AdminDashboardPage() {
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{getStatusBadge(user.isActive)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Modifier"
                             onClick={() => handleEdit(user)}
                           >
                             <Edit className="w-4 h-4" />
@@ -474,7 +540,16 @@ export default function AdminDashboardPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Réinitialiser le mot de passe"
+                            onClick={() => handleOpenResetPassword(user)}
+                          >
+                            <Key className="w-4 h-4 text-amber-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-red-500"
+                            title="Supprimer"
                             onClick={() => handleDelete(user.id)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -540,6 +615,76 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Reset Password Dialog */}
+      <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-600" />
+              Réinitialiser le mot de passe
+            </DialogTitle>
+            <DialogDescription>
+              Réinitialiser le mot de passe pour {resetPasswordUser?.name} ({resetPasswordUser?.email})
+            </DialogDescription>
+          </DialogHeader>
+          
+          {resetPasswordMessage && (
+            <Alert variant={resetPasswordMessage.type === 'error' ? 'destructive' : 'default'} 
+              className={resetPasswordMessage.type === 'success' ? 'border-green-500 bg-green-50' : ''}>
+              {resetPasswordMessage.type === 'success' 
+                ? <CheckCircle className="h-4 w-4 text-green-600" /> 
+                : <AlertCircle className="h-4 w-4" />}
+              <AlertDescription>{resetPasswordMessage.text}</AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Nouveau mot de passe</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={resetPasswordData.newPassword}
+                onChange={(e) => setResetPasswordData({ ...resetPasswordData, newPassword: e.target.value })}
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={resetPasswordData.confirmPassword}
+                onChange={(e) => setResetPasswordData({ ...resetPasswordData, confirmPassword: e.target.value })}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setResetPasswordDialogOpen(false);
+              setResetPasswordUser(null);
+              setResetPasswordData({ newPassword: '', confirmPassword: '' });
+              setResetPasswordMessage(null);
+            }}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleResetPassword}
+              disabled={resetPasswordSaving}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {resetPasswordSaving ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Réinitialisation...</>
+              ) : (
+                'Réinitialiser'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

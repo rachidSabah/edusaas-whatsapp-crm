@@ -19,10 +19,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Settings, User, Building2, Bot, MessageSquare, Save, QrCode, 
   Send, Loader2, Sparkles, RefreshCw, CheckCircle, XCircle,
-  Upload, FileText, Trash2, Download, Clock, Mail, Plus
+  Upload, FileText, Trash2, Download, Clock, Mail, Plus, Lock, Key, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_MODELS, initPuter, isPuterLoaded, aiChat, getKV, setKV } from '@/lib/puter';
@@ -132,6 +141,17 @@ Instructions:
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
   const [editingConfig, setEditingConfig] = useState<EmailConfig | null>(null);
+  
+  // Password Change Dialog
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
   const [emailFormData, setEmailFormData] = useState({
     provider: 'smtp',
     smtpHost: '',
@@ -1190,6 +1210,130 @@ Instructions:
 
         {/* Account Tab */}
         <TabsContent value="account" className="space-y-6">
+          {/* Password Change Dialog */}
+          <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Key className="w-5 h-5 text-green-600" />
+                  Changer le mot de passe
+                </DialogTitle>
+                <DialogDescription>
+                  Entrez votre mot de passe actuel et le nouveau mot de passe
+                </DialogDescription>
+              </DialogHeader>
+              
+              {passwordMessage && (
+                <Alert variant={passwordMessage.type === 'error' ? 'destructive' : 'default'} 
+                  className={passwordMessage.type === 'success' ? 'border-green-500 bg-green-50' : ''}>
+                  {passwordMessage.type === 'success' 
+                    ? <CheckCircle className="h-4 w-4 text-green-600" /> 
+                    : <AlertCircle className="h-4 w-4" />}
+                  <AlertDescription>{passwordMessage.text}</AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">Mot de passe actuel</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">Nouveau mot de passe</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirmer le nouveau mot de passe</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setPasswordDialogOpen(false);
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  setPasswordMessage(null);
+                }}>
+                  Annuler
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+                      setPasswordMessage({ type: 'error', text: 'Veuillez remplir tous les champs' });
+                      return;
+                    }
+                    if (passwordData.newPassword !== passwordData.confirmPassword) {
+                      setPasswordMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas' });
+                      return;
+                    }
+                    if (passwordData.newPassword.length < 6) {
+                      setPasswordMessage({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' });
+                      return;
+                    }
+                    
+                    setPasswordSaving(true);
+                    setPasswordMessage(null);
+                    
+                    try {
+                      const response = await fetch('/api/profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          currentPassword: passwordData.currentPassword,
+                          newPassword: passwordData.newPassword,
+                        }),
+                      });
+                      
+                      const data = await response.json();
+                      
+                      if (response.ok) {
+                        setPasswordMessage({ type: 'success', text: 'Mot de passe changé avec succès!' });
+                        setTimeout(() => {
+                          setPasswordDialogOpen(false);
+                          setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                          setPasswordMessage(null);
+                        }, 1500);
+                      } else {
+                        setPasswordMessage({ type: 'error', text: data.error || 'Erreur lors du changement de mot de passe' });
+                      }
+                    } catch (error) {
+                      setPasswordMessage({ type: 'error', text: 'Erreur de connexion' });
+                    } finally {
+                      setPasswordSaving(false);
+                    }
+                  }}
+                  disabled={passwordSaving}
+                  className="bg-green-600"
+                >
+                  {passwordSaving ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Changement...</>
+                  ) : (
+                    'Changer le mot de passe'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
           <Card className="border-0 shadow-md">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -1216,9 +1360,65 @@ Instructions:
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" className="w-full">
-                Changer le mot de passe
-              </Button>
+              
+              <Separator />
+              
+              {/* Change Password */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Mot de passe</p>
+                  <p className="text-sm text-slate-500">Changez votre mot de passe</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setPasswordDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  Changer
+                </Button>
+              </div>
+              
+              <Separator />
+              
+              {/* Profile Link */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Profil</p>
+                  <p className="text-sm text-slate-500">Gérez vos informations personnelles</p>
+                </div>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.location.href = '/dashboard/profile'}
+                  className="gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  Voir le profil
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Admin Link - Only for admins */}
+          <Card className="border-0 shadow-md bg-blue-50">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <Settings className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-blue-900">Administration</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Gérez les utilisateurs, enseignants et paramètres de l'organisation.
+                  </p>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 bg-white"
+                    onClick={() => window.location.href = '/dashboard/admin'}
+                  >
+                    Accéder à l'administration
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
