@@ -60,6 +60,31 @@ interface BrandingSettings {
   contactEmail: string | null;
   contactPhone: string | null;
   customCss: string | null;
+  // Pricing fields
+  showPricing: boolean;
+  pricingTitle: string;
+  pricingSubtitle: string;
+  plan1Name: string;
+  plan1Price: string;
+  plan1Period: string;
+  plan1Description: string;
+  plan1Features: string;
+  plan1Highlighted: boolean;
+  plan1ButtonText: string;
+  plan2Name: string;
+  plan2Price: string;
+  plan2Period: string;
+  plan2Description: string;
+  plan2Features: string;
+  plan2Highlighted: boolean;
+  plan2ButtonText: string;
+  plan3Name: string;
+  plan3Price: string;
+  plan3Period: string;
+  plan3Description: string;
+  plan3Features: string;
+  plan3Highlighted: boolean;
+  plan3ButtonText: string;
 }
 
 const DEFAULT_BRANDING: BrandingSettings = {
@@ -94,6 +119,31 @@ const DEFAULT_BRANDING: BrandingSettings = {
   contactEmail: null,
   contactPhone: null,
   customCss: null,
+  // Pricing defaults
+  showPricing: true,
+  pricingTitle: 'Transparent Pricing',
+  pricingSubtitle: 'Choose the plan that fits your institution',
+  plan1Name: 'Starter',
+  plan1Price: '299',
+  plan1Period: '/month',
+  plan1Description: 'Ideal for small academies',
+  plan1Features: '100 students|3 users|500 AI messages/day|10 templates|Email support',
+  plan1Highlighted: false,
+  plan1ButtonText: 'Get Started',
+  plan2Name: 'Professional',
+  plan2Price: '799',
+  plan2Period: '/month',
+  plan2Description: 'For growing schools',
+  plan2Features: '500 students|10 users|2000 AI messages/day|50 templates|Priority support|Advanced reports',
+  plan2Highlighted: true,
+  plan2ButtonText: 'Get Started',
+  plan3Name: 'Enterprise',
+  plan3Price: '1999',
+  plan3Period: '/month',
+  plan3Description: 'For large institutions',
+  plan3Features: 'Unlimited students|Unlimited users|10000 AI messages/day|Unlimited templates|Dedicated support|API access|Training included',
+  plan3Highlighted: false,
+  plan3ButtonText: 'Contact Sales',
 };
 
 // Icon mapping
@@ -135,6 +185,11 @@ export default function LandingPage() {
   // Get icon component
   const getIcon = (iconName: string) => {
     return iconMap[iconName] || MessageSquare;
+  };
+
+  // Parse features string to array
+  const parseFeatures = (features: string) => {
+    return features.split('|').map(f => f.trim()).filter(f => f);
   };
 
   // Parse gradient classes
@@ -364,63 +419,38 @@ export default function LandingPage() {
       )}
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 bg-white">
-        <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Transparent Pricing
-            </h2>
-            <p className="text-lg text-slate-600">Choose the plan that fits your institution</p>
-          </div>
+      {branding.showPricing && (
+        <section id="pricing" className="py-20 px-4 bg-white">
+          <div className="container mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                {branding.pricingTitle}
+              </h2>
+              <p className="text-lg text-slate-600">{branding.pricingSubtitle}</p>
+            </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                name: 'Starter',
-                price: '299',
-                period: '/month',
-                description: 'Ideal for small academies',
-                features: ['100 students', '3 users', '500 AI messages/day', '10 templates', 'Email support'],
-                popular: false
-              },
-              {
-                name: 'Professional',
-                price: '799',
-                period: '/month',
-                description: 'For growing schools',
-                features: ['500 students', '10 users', '2000 AI messages/day', '50 templates', 'Priority support', 'Advanced reports'],
-                popular: true
-              },
-              {
-                name: 'Enterprise',
-                price: '1999',
-                period: '/month',
-                description: 'For large institutions',
-                features: ['Unlimited students', 'Unlimited users', '10000 AI messages/day', 'Unlimited templates', 'Dedicated support', 'API access', 'Training included'],
-                popular: false
-              }
-            ].map((plan, i) => (
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {/* Plan 1 */}
               <Card
-                key={i}
-                className={`relative ${plan.popular ? 'border-2 shadow-xl' : 'border shadow-lg'}`}
-                style={plan.popular ? { borderColor: branding.primaryColor } : {}}
+                className={`relative ${branding.plan1Highlighted ? 'border-2 shadow-xl' : 'border shadow-lg'}`}
+                style={branding.plan1Highlighted ? { borderColor: branding.primaryColor } : {}}
               >
-                {plan.popular && (
+                {branding.plan1Highlighted && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <Badge style={{ backgroundColor: branding.primaryColor }} className="text-white">Most Popular</Badge>
                   </div>
                 )}
                 <CardHeader className="text-center pt-8">
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardTitle className="text-xl">{branding.plan1Name}</CardTitle>
+                  <CardDescription>{branding.plan1Description}</CardDescription>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-slate-900">{plan.price}</span>
-                    <span className="text-slate-500">{plan.period}</span>
+                    <span className="text-4xl font-bold text-slate-900">{branding.plan1Price}</span>
+                    <span className="text-slate-500">{branding.plan1Period}</span>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3 mb-6">
-                    {plan.features.map((feature, j) => (
+                    {parseFeatures(branding.plan1Features).map((feature, j) => (
                       <li key={j} className="flex items-center gap-2 text-slate-600">
                         <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: branding.primaryColor }} />
                         {feature}
@@ -430,20 +460,102 @@ export default function LandingPage() {
                   <Link href="/register" className="block">
                     <Button
                       className="w-full hover:opacity-90"
-                      variant={plan.popular ? 'default' : 'outline'}
-                      style={plan.popular ? {
+                      variant={branding.plan1Highlighted ? 'default' : 'outline'}
+                      style={branding.plan1Highlighted ? {
                         background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
                       } : {}}
                     >
-                      Get Started
+                      {branding.plan1ButtonText}
                     </Button>
                   </Link>
                 </CardContent>
               </Card>
-            ))}
+
+              {/* Plan 2 */}
+              <Card
+                className={`relative ${branding.plan2Highlighted ? 'border-2 shadow-xl' : 'border shadow-lg'}`}
+                style={branding.plan2Highlighted ? { borderColor: branding.primaryColor } : {}}
+              >
+                {branding.plan2Highlighted && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge style={{ backgroundColor: branding.primaryColor }} className="text-white">Most Popular</Badge>
+                  </div>
+                )}
+                <CardHeader className="text-center pt-8">
+                  <CardTitle className="text-xl">{branding.plan2Name}</CardTitle>
+                  <CardDescription>{branding.plan2Description}</CardDescription>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-slate-900">{branding.plan2Price}</span>
+                    <span className="text-slate-500">{branding.plan2Period}</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    {parseFeatures(branding.plan2Features).map((feature, j) => (
+                      <li key={j} className="flex items-center gap-2 text-slate-600">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: branding.primaryColor }} />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/register" className="block">
+                    <Button
+                      className="w-full hover:opacity-90"
+                      variant={branding.plan2Highlighted ? 'default' : 'outline'}
+                      style={branding.plan2Highlighted ? {
+                        background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
+                      } : {}}
+                    >
+                      {branding.plan2ButtonText}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Plan 3 */}
+              <Card
+                className={`relative ${branding.plan3Highlighted ? 'border-2 shadow-xl' : 'border shadow-lg'}`}
+                style={branding.plan3Highlighted ? { borderColor: branding.primaryColor } : {}}
+              >
+                {branding.plan3Highlighted && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge style={{ backgroundColor: branding.primaryColor }} className="text-white">Most Popular</Badge>
+                  </div>
+                )}
+                <CardHeader className="text-center pt-8">
+                  <CardTitle className="text-xl">{branding.plan3Name}</CardTitle>
+                  <CardDescription>{branding.plan3Description}</CardDescription>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-slate-900">{branding.plan3Price}</span>
+                    <span className="text-slate-500">{branding.plan3Period}</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    {parseFeatures(branding.plan3Features).map((feature, j) => (
+                      <li key={j} className="flex items-center gap-2 text-slate-600">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: branding.primaryColor }} />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/register" className="block">
+                    <Button
+                      className="w-full hover:opacity-90"
+                      variant={branding.plan3Highlighted ? 'default' : 'outline'}
+                      style={branding.plan3Highlighted ? {
+                        background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})`
+                      } : {}}
+                    >
+                      {branding.plan3ButtonText}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Why Choose Us */}
       <section className="py-20 px-4 bg-gradient-to-b from-slate-900 to-slate-800 text-white">

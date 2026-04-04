@@ -37,6 +37,31 @@ interface BrandingSettings {
   contactEmail: string | null;
   contactPhone: string | null;
   customCss: string | null;
+  // Pricing fields
+  showPricing: number;
+  pricingTitle: string;
+  pricingSubtitle: string;
+  plan1Name: string;
+  plan1Price: string;
+  plan1Period: string;
+  plan1Description: string;
+  plan1Features: string;
+  plan1Highlighted: number;
+  plan1ButtonText: string;
+  plan2Name: string;
+  plan2Price: string;
+  plan2Period: string;
+  plan2Description: string;
+  plan2Features: string;
+  plan2Highlighted: number;
+  plan2ButtonText: string;
+  plan3Name: string;
+  plan3Price: string;
+  plan3Period: string;
+  plan3Description: string;
+  plan3Features: string;
+  plan3Highlighted: number;
+  plan3ButtonText: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +95,31 @@ const DEFAULT_BRANDING: Partial<BrandingSettings> = {
   feature3Icon: 'BarChart3',
   footerText: '© 2026 EduSaaS. All rights reserved.',
   logoWidth: 40,
+  // Pricing defaults
+  showPricing: 1,
+  pricingTitle: 'Transparent Pricing',
+  pricingSubtitle: 'Choose the plan that fits your institution',
+  plan1Name: 'Starter',
+  plan1Price: '299',
+  plan1Period: '/month',
+  plan1Description: 'Ideal for small academies',
+  plan1Features: '100 students|3 users|500 AI messages/day|10 templates|Email support',
+  plan1Highlighted: 0,
+  plan1ButtonText: 'Get Started',
+  plan2Name: 'Professional',
+  plan2Price: '799',
+  plan2Period: '/month',
+  plan2Description: 'For growing schools',
+  plan2Features: '500 students|10 users|2000 AI messages/day|50 templates|Priority support|Advanced reports',
+  plan2Highlighted: 1,
+  plan2ButtonText: 'Get Started',
+  plan3Name: 'Enterprise',
+  plan3Price: '1999',
+  plan3Period: '/month',
+  plan3Description: 'For large institutions',
+  plan3Features: 'Unlimited students|Unlimited users|10000 AI messages/day|Unlimited templates|Dedicated support|API access|Training included',
+  plan3Highlighted: 0,
+  plan3ButtonText: 'Contact Sales',
 };
 
 /**
@@ -115,6 +165,10 @@ export async function GET(request: NextRequest) {
       branding: {
         ...branding,
         showFeatures: branding.showFeatures === 1,
+        showPricing: branding.showPricing === 1,
+        plan1Highlighted: branding.plan1Highlighted === 1,
+        plan2Highlighted: branding.plan2Highlighted === 1,
+        plan3Highlighted: branding.plan3Highlighted === 1,
       },
       isDefault: false,
     }, {
@@ -195,6 +249,31 @@ export async function PUT(request: NextRequest) {
       contactEmail,
       contactPhone,
       customCss,
+      // Pricing fields
+      showPricing,
+      pricingTitle,
+      pricingSubtitle,
+      plan1Name,
+      plan1Price,
+      plan1Period,
+      plan1Description,
+      plan1Features,
+      plan1Highlighted,
+      plan1ButtonText,
+      plan2Name,
+      plan2Price,
+      plan2Period,
+      plan2Description,
+      plan2Features,
+      plan2Highlighted,
+      plan2ButtonText,
+      plan3Name,
+      plan3Price,
+      plan3Period,
+      plan3Description,
+      plan3Features,
+      plan3Highlighted,
+      plan3ButtonText,
     } = body;
 
     // Check if branding exists for this organization
@@ -238,6 +317,30 @@ export async function PUT(request: NextRequest) {
           contactEmail = COALESCE(?, contactEmail),
           contactPhone = COALESCE(?, contactPhone),
           customCss = COALESCE(?, customCss),
+          showPricing = COALESCE(?, showPricing),
+          pricingTitle = COALESCE(?, pricingTitle),
+          pricingSubtitle = COALESCE(?, pricingSubtitle),
+          plan1Name = COALESCE(?, plan1Name),
+          plan1Price = COALESCE(?, plan1Price),
+          plan1Period = COALESCE(?, plan1Period),
+          plan1Description = COALESCE(?, plan1Description),
+          plan1Features = COALESCE(?, plan1Features),
+          plan1Highlighted = COALESCE(?, plan1Highlighted),
+          plan1ButtonText = COALESCE(?, plan1ButtonText),
+          plan2Name = COALESCE(?, plan2Name),
+          plan2Price = COALESCE(?, plan2Price),
+          plan2Period = COALESCE(?, plan2Period),
+          plan2Description = COALESCE(?, plan2Description),
+          plan2Features = COALESCE(?, plan2Features),
+          plan2Highlighted = COALESCE(?, plan2Highlighted),
+          plan2ButtonText = COALESCE(?, plan2ButtonText),
+          plan3Name = COALESCE(?, plan3Name),
+          plan3Price = COALESCE(?, plan3Price),
+          plan3Period = COALESCE(?, plan3Period),
+          plan3Description = COALESCE(?, plan3Description),
+          plan3Features = COALESCE(?, plan3Features),
+          plan3Highlighted = COALESCE(?, plan3Highlighted),
+          plan3ButtonText = COALESCE(?, plan3ButtonText),
           updatedAt = CURRENT_TIMESTAMP
         WHERE organizationId = ?`,
         [
@@ -252,6 +355,18 @@ export async function PUT(request: NextRequest) {
           nullIfUndefined(footerText), nullIfUndefined(facebookUrl), nullIfUndefined(twitterUrl), 
           nullIfUndefined(linkedinUrl), nullIfUndefined(instagramUrl), nullIfUndefined(contactEmail), 
           nullIfUndefined(contactPhone), nullIfUndefined(customCss),
+          // Pricing fields
+          showPricing ? 1 : 0,
+          nullIfUndefined(pricingTitle), nullIfUndefined(pricingSubtitle),
+          nullIfUndefined(plan1Name), nullIfUndefined(plan1Price), nullIfUndefined(plan1Period),
+          nullIfUndefined(plan1Description), nullIfUndefined(plan1Features), plan1Highlighted ? 1 : 0,
+          nullIfUndefined(plan1ButtonText),
+          nullIfUndefined(plan2Name), nullIfUndefined(plan2Price), nullIfUndefined(plan2Period),
+          nullIfUndefined(plan2Description), nullIfUndefined(plan2Features), plan2Highlighted ? 1 : 0,
+          nullIfUndefined(plan2ButtonText),
+          nullIfUndefined(plan3Name), nullIfUndefined(plan3Price), nullIfUndefined(plan3Period),
+          nullIfUndefined(plan3Description), nullIfUndefined(plan3Features), plan3Highlighted ? 1 : 0,
+          nullIfUndefined(plan3ButtonText),
           user.organizationId
         ]
       );
@@ -265,8 +380,12 @@ export async function PUT(request: NextRequest) {
           showFeatures, feature1Title, feature1Description, feature1Icon,
           feature2Title, feature2Description, feature2Icon,
           feature3Title, feature3Description, feature3Icon,
-          footerText, facebookUrl, twitterUrl, linkedinUrl, instagramUrl, contactEmail, contactPhone, customCss
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          footerText, facebookUrl, twitterUrl, linkedinUrl, instagramUrl, contactEmail, contactPhone, customCss,
+          showPricing, pricingTitle, pricingSubtitle,
+          plan1Name, plan1Price, plan1Period, plan1Description, plan1Features, plan1Highlighted, plan1ButtonText,
+          plan2Name, plan2Price, plan2Period, plan2Description, plan2Features, plan2Highlighted, plan2ButtonText,
+          plan3Name, plan3Price, plan3Period, plan3Description, plan3Features, plan3Highlighted, plan3ButtonText
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, user.organizationId, nullIfUndefined(logo), nullIfUndefined(logoWidth) || 40, 
           nullIfUndefined(appName), nullIfUndefined(tagline), nullIfUndefined(primaryColor), 
@@ -279,7 +398,32 @@ export async function PUT(request: NextRequest) {
           nullIfUndefined(feature3Title), nullIfUndefined(feature3Description), nullIfUndefined(feature3Icon),
           nullIfUndefined(footerText), nullIfUndefined(facebookUrl), nullIfUndefined(twitterUrl), 
           nullIfUndefined(linkedinUrl), nullIfUndefined(instagramUrl), nullIfUndefined(contactEmail), 
-          nullIfUndefined(contactPhone), nullIfUndefined(customCss)
+          nullIfUndefined(contactPhone), nullIfUndefined(customCss),
+          // Pricing fields
+          showPricing ? 1 : 1,
+          nullIfUndefined(pricingTitle) || 'Transparent Pricing',
+          nullIfUndefined(pricingSubtitle) || 'Choose the plan that fits your institution',
+          nullIfUndefined(plan1Name) || 'Starter',
+          nullIfUndefined(plan1Price) || '299',
+          nullIfUndefined(plan1Period) || '/month',
+          nullIfUndefined(plan1Description) || 'Ideal for small academies',
+          nullIfUndefined(plan1Features) || '100 students|3 users|500 AI messages/day',
+          plan1Highlighted ? 1 : 0,
+          nullIfUndefined(plan1ButtonText) || 'Get Started',
+          nullIfUndefined(plan2Name) || 'Professional',
+          nullIfUndefined(plan2Price) || '799',
+          nullIfUndefined(plan2Period) || '/month',
+          nullIfUndefined(plan2Description) || 'For growing schools',
+          nullIfUndefined(plan2Features) || '500 students|10 users|2000 AI messages/day',
+          plan2Highlighted ? 1 : 1,
+          nullIfUndefined(plan2ButtonText) || 'Get Started',
+          nullIfUndefined(plan3Name) || 'Enterprise',
+          nullIfUndefined(plan3Price) || '1999',
+          nullIfUndefined(plan3Period) || '/month',
+          nullIfUndefined(plan3Description) || 'For large institutions',
+          nullIfUndefined(plan3Features) || 'Unlimited students|Unlimited users|API access',
+          plan3Highlighted ? 1 : 0,
+          nullIfUndefined(plan3ButtonText) || 'Contact Sales'
         ]
       );
     }
@@ -295,6 +439,10 @@ export async function PUT(request: NextRequest) {
       branding: {
         ...results[0],
         showFeatures: results[0].showFeatures === 1,
+        showPricing: results[0].showPricing === 1,
+        plan1Highlighted: results[0].plan1Highlighted === 1,
+        plan2Highlighted: results[0].plan2Highlighted === 1,
+        plan3Highlighted: results[0].plan3Highlighted === 1,
       },
     });
   } catch (error) {

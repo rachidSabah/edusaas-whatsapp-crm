@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
   Palette,
   Type,
@@ -21,6 +22,8 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  DollarSign,
+  Star,
 } from 'lucide-react';
 
 interface BrandingSettings {
@@ -56,6 +59,31 @@ interface BrandingSettings {
   contactEmail: string | null;
   contactPhone: string | null;
   customCss: string | null;
+  // Pricing fields
+  showPricing: boolean;
+  pricingTitle: string;
+  pricingSubtitle: string;
+  plan1Name: string;
+  plan1Price: string;
+  plan1Period: string;
+  plan1Description: string;
+  plan1Features: string;
+  plan1Highlighted: boolean;
+  plan1ButtonText: string;
+  plan2Name: string;
+  plan2Price: string;
+  plan2Period: string;
+  plan2Description: string;
+  plan2Features: string;
+  plan2Highlighted: boolean;
+  plan2ButtonText: string;
+  plan3Name: string;
+  plan3Price: string;
+  plan3Period: string;
+  plan3Description: string;
+  plan3Features: string;
+  plan3Highlighted: boolean;
+  plan3ButtonText: string;
 }
 
 const DEFAULT_BRANDING: BrandingSettings = {
@@ -90,6 +118,31 @@ const DEFAULT_BRANDING: BrandingSettings = {
   contactEmail: null,
   contactPhone: null,
   customCss: null,
+  // Pricing defaults
+  showPricing: true,
+  pricingTitle: 'Transparent Pricing',
+  pricingSubtitle: 'Choose the plan that fits your institution',
+  plan1Name: 'Starter',
+  plan1Price: '299',
+  plan1Period: '/month',
+  plan1Description: 'Ideal for small academies',
+  plan1Features: '100 students|3 users|500 AI messages/day|10 templates|Email support',
+  plan1Highlighted: false,
+  plan1ButtonText: 'Get Started',
+  plan2Name: 'Professional',
+  plan2Price: '799',
+  plan2Period: '/month',
+  plan2Description: 'For growing schools',
+  plan2Features: '500 students|10 users|2000 AI messages/day|50 templates|Priority support|Advanced reports',
+  plan2Highlighted: true,
+  plan2ButtonText: 'Get Started',
+  plan3Name: 'Enterprise',
+  plan3Price: '1999',
+  plan3Period: '/month',
+  plan3Description: 'For large institutions',
+  plan3Features: 'Unlimited students|Unlimited users|10000 AI messages/day|Unlimited templates|Dedicated support|API access|Training included',
+  plan3Highlighted: false,
+  plan3ButtonText: 'Contact Sales',
 };
 
 export default function BrandingSettingsPage() {
@@ -178,6 +231,11 @@ export default function BrandingSettingsPage() {
     setBranding({ ...branding, [field]: value });
   };
 
+  // Parse features for preview
+  const parseFeatures = (features: string) => {
+    return features.split('|').map(f => f.trim()).filter(f => f);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -235,7 +293,7 @@ export default function BrandingSettingsPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Settings Tabs */}
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="general">
               <Type className="w-4 h-4 mr-2" />
               General
@@ -247,6 +305,10 @@ export default function BrandingSettingsPage() {
             <TabsTrigger value="hero">
               <Layout className="w-4 h-4 mr-2" />
               Hero
+            </TabsTrigger>
+            <TabsTrigger value="pricing">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="footer">
               <Image className="w-4 h-4 mr-2" />
@@ -537,6 +599,245 @@ export default function BrandingSettingsPage() {
             </Card>
           </TabsContent>
 
+          {/* Pricing Tab */}
+          <TabsContent value="pricing">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Pricing Section</CardTitle>
+                    <CardDescription>Customize your pricing plans</CardDescription>
+                  </div>
+                  <Switch
+                    checked={branding.showPricing}
+                    onCheckedChange={(checked) => updateField('showPricing', checked)}
+                  />
+                </div>
+              </CardHeader>
+              {branding.showPricing && (
+                <CardContent className="space-y-6">
+                  {/* Pricing Header */}
+                  <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 rounded-lg">
+                    <div className="space-y-2">
+                      <Label htmlFor="pricingTitle">Pricing Title</Label>
+                      <Input
+                        id="pricingTitle"
+                        value={branding.pricingTitle}
+                        onChange={(e) => updateField('pricingTitle', e.target.value)}
+                        placeholder="Transparent Pricing"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pricingSubtitle">Pricing Subtitle</Label>
+                      <Input
+                        id="pricingSubtitle"
+                        value={branding.pricingSubtitle}
+                        onChange={(e) => updateField('pricingSubtitle', e.target.value)}
+                        placeholder="Choose the plan that fits your institution"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Plan 1 */}
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Plan 1</Badge>
+                        <span className="font-medium">{branding.plan1Name}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          value={branding.plan1Name}
+                          onChange={(e) => updateField('plan1Name', e.target.value)}
+                          placeholder="Starter"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Price</Label>
+                        <Input
+                          value={branding.plan1Price}
+                          onChange={(e) => updateField('plan1Price', e.target.value)}
+                          placeholder="299"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Period</Label>
+                        <Input
+                          value={branding.plan1Period}
+                          onChange={(e) => updateField('plan1Period', e.target.value)}
+                          placeholder="/month"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Button Text</Label>
+                        <Input
+                          value={branding.plan1ButtonText}
+                          onChange={(e) => updateField('plan1ButtonText', e.target.value)}
+                          placeholder="Get Started"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Description</Label>
+                      <Input
+                        value={branding.plan1Description}
+                        onChange={(e) => updateField('plan1Description', e.target.value)}
+                        placeholder="Ideal for small academies"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Features (separate with |)</Label>
+                      <Textarea
+                        value={branding.plan1Features}
+                        onChange={(e) => updateField('plan1Features', e.target.value)}
+                        placeholder="100 students|3 users|500 AI messages/day"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Plan 2 */}
+                  <div className="space-y-3 p-4 border-2 rounded-lg" style={{ borderColor: branding.primaryColor }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge style={{ backgroundColor: branding.primaryColor }}>Plan 2</Badge>
+                        <span className="font-medium">{branding.plan2Name}</span>
+                        {branding.plan2Highlighted && (
+                          <Badge variant="secondary" className="ml-2">
+                            <Star className="w-3 h-3 mr-1" />
+                            Popular
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Highlight</Label>
+                        <Switch
+                          checked={branding.plan2Highlighted}
+                          onCheckedChange={(checked) => updateField('plan2Highlighted', checked)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          value={branding.plan2Name}
+                          onChange={(e) => updateField('plan2Name', e.target.value)}
+                          placeholder="Professional"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Price</Label>
+                        <Input
+                          value={branding.plan2Price}
+                          onChange={(e) => updateField('plan2Price', e.target.value)}
+                          placeholder="799"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Period</Label>
+                        <Input
+                          value={branding.plan2Period}
+                          onChange={(e) => updateField('plan2Period', e.target.value)}
+                          placeholder="/month"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Button Text</Label>
+                        <Input
+                          value={branding.plan2ButtonText}
+                          onChange={(e) => updateField('plan2ButtonText', e.target.value)}
+                          placeholder="Get Started"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Description</Label>
+                      <Input
+                        value={branding.plan2Description}
+                        onChange={(e) => updateField('plan2Description', e.target.value)}
+                        placeholder="For growing schools"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Features (separate with |)</Label>
+                      <Textarea
+                        value={branding.plan2Features}
+                        onChange={(e) => updateField('plan2Features', e.target.value)}
+                        placeholder="500 students|10 users|2000 AI messages/day"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Plan 3 */}
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Plan 3</Badge>
+                        <span className="font-medium">{branding.plan3Name}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          value={branding.plan3Name}
+                          onChange={(e) => updateField('plan3Name', e.target.value)}
+                          placeholder="Enterprise"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Price</Label>
+                        <Input
+                          value={branding.plan3Price}
+                          onChange={(e) => updateField('plan3Price', e.target.value)}
+                          placeholder="1999"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Period</Label>
+                        <Input
+                          value={branding.plan3Period}
+                          onChange={(e) => updateField('plan3Period', e.target.value)}
+                          placeholder="/month"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Button Text</Label>
+                        <Input
+                          value={branding.plan3ButtonText}
+                          onChange={(e) => updateField('plan3ButtonText', e.target.value)}
+                          placeholder="Contact Sales"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Description</Label>
+                      <Input
+                        value={branding.plan3Description}
+                        onChange={(e) => updateField('plan3Description', e.target.value)}
+                        placeholder="For large institutions"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Features (separate with |)</Label>
+                      <Textarea
+                        value={branding.plan3Features}
+                        onChange={(e) => updateField('plan3Features', e.target.value)}
+                        placeholder="Unlimited students|Unlimited users|10000 AI messages/day"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          </TabsContent>
+
           {/* Footer Tab */}
           <TabsContent value="footer">
             <Card>
@@ -712,6 +1013,45 @@ export default function BrandingSettingsPage() {
                         <span style={{ color: branding.accentColor }}>📊</span>
                       </div>
                       <h3 className="text-xs font-semibold">{branding.feature3Title}</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pricing Preview */}
+              {branding.showPricing && (
+                <div className="p-4 bg-white">
+                  <h3 className="text-center font-bold mb-1">{branding.pricingTitle}</h3>
+                  <p className="text-center text-xs text-slate-500 mb-4">{branding.pricingSubtitle}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Plan 1 */}
+                    <div className="text-center p-2 border rounded-lg">
+                      <h4 className="text-xs font-semibold">{branding.plan1Name}</h4>
+                      <div className="text-sm font-bold" style={{ color: branding.primaryColor }}>
+                        {branding.plan1Price}
+                      </div>
+                      <p className="text-[10px] text-slate-500">{branding.plan1Period}</p>
+                    </div>
+                    {/* Plan 2 */}
+                    <div className="text-center p-2 border-2 rounded-lg relative" style={{ borderColor: branding.primaryColor }}>
+                      {branding.plan2Highlighted && (
+                        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px]" style={{ backgroundColor: branding.primaryColor }}>
+                          Popular
+                        </Badge>
+                      )}
+                      <h4 className="text-xs font-semibold">{branding.plan2Name}</h4>
+                      <div className="text-sm font-bold" style={{ color: branding.primaryColor }}>
+                        {branding.plan2Price}
+                      </div>
+                      <p className="text-[10px] text-slate-500">{branding.plan2Period}</p>
+                    </div>
+                    {/* Plan 3 */}
+                    <div className="text-center p-2 border rounded-lg">
+                      <h4 className="text-xs font-semibold">{branding.plan3Name}</h4>
+                      <div className="text-sm font-bold" style={{ color: branding.primaryColor }}>
+                        {branding.plan3Price}
+                      </div>
+                      <p className="text-[10px] text-slate-500">{branding.plan3Period}</p>
                     </div>
                   </div>
                 </div>
