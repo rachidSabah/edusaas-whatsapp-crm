@@ -55,3 +55,4 @@ server.log
 
 # baileys auth state
 auth_info_baileys/
+.credentials.md
