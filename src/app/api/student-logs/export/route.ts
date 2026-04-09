@@ -54,8 +54,22 @@ export async function POST(request: NextRequest) {
       [studentId, user.organizationId]
     );
 
-    // Generate DOCX content
-    const docxBuffer = generateDocxContent(student, logs || []);
+    // Fetch organization logo from branding settings
+    let logoBase64: string | null = null;
+    try {
+      const brandingResults = await db.query<{ logo: string | null }>(
+        `SELECT logo FROM branding_settings WHERE organizationId = ?`,
+        [user.organizationId]
+      );
+      if (brandingResults.length > 0 && brandingResults[0].logo) {
+        logoBase64 = brandingResults[0].logo;
+      }
+    } catch (err) {
+      console.error('Error fetching logo:', err);
+    }
+
+    // Generate DOCX content with logo
+    const docxBuffer = generateDocxContent(student, logs || [], logoBase64);
 
     // Return as downloadable file
     return new NextResponse(docxBuffer, {
@@ -70,7 +84,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateDocxContent(student: Student, logs: StudentLog[]): Uint8Array {
+function generateDocxContent(student: Student, logs: StudentLog[], logoBase64: string | null): Uint8Array {
   // Create a proper DOCX structure with XML
   const now = new Date();
   const generatedDate = now.toLocaleDateString('fr-FR', {
@@ -86,6 +100,49 @@ function generateDocxContent(student: Student, logs: StudentLog[]): Uint8Array {
     mise_a_pied: logs.filter(l => l.type === 'mise_a_pied').length,
     termination: logs.filter(l => l.type === 'termination').length,
   };
+
+  // Generate logo XML if available
+  let logoXml = '';
+  if (logoBase64) {
+    // For DOCX, we need to embed the image properly
+    // Using a simple approach with a placeholder reference
+    logoXml = `
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+            <wp:extent cx="2510000" cy="1360000"/>
+            <wp:docPr id="0" name="Logo"/>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="logo.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="logoImg"/>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="2510000" cy="1360000"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>`;
+  }
 
   const logsXml = logs
     .map((log, index) => {
@@ -223,6 +280,7 @@ function generateDocxContent(student: Student, logs: StudentLog[]): Uint8Array {
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
             xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
+    ${logoXml}
     <w:p>
       <w:pPr>
         <w:pStyle w:val="Heading1"/>

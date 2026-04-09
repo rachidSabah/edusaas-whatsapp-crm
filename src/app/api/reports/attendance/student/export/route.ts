@@ -7,7 +7,11 @@ import { getDbContext } from '@/lib/db-hybrid';
 // Generate DOCX content (simple XML-based approach)
 function generateDocx(content: string): Uint8Array {
   const docTemplate = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
 <w:body>
 ${content}
 </w:body>
@@ -133,6 +137,20 @@ export async function GET(request: NextRequest) {
     const summary = summaryResult[0] || { present: 0, absent: 0, late: 0, excused: 0, total: 0 };
     const rate = summary.total > 0 ? Math.round((summary.present / summary.total) * 100) : 0;
 
+    // Fetch organization logo from branding settings
+    let logoBase64: string | null = null;
+    try {
+      const brandingResults = await db.query<{ logo: string | null }>(
+        `SELECT logo FROM branding_settings WHERE organizationId = ?`,
+        [user.organizationId]
+      );
+      if (brandingResults.length > 0 && brandingResults[0].logo) {
+        logoBase64 = brandingResults[0].logo;
+      }
+    } catch (err) {
+      console.error('Error fetching logo:', err);
+    }
+
     const monthLabel = month && month !== 'all' 
       ? new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
       : 'Toute l\'année';
@@ -179,8 +197,33 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Generate DOCX
+    // Generate DOCX with logo
     let docContent = '';
+    
+    // Add logo if available
+    if (logoBase64) {
+      docContent += `<w:p>
+<w:pPr><w:jc w:val="center"/></w:pPr>
+<w:r>
+<w:drawing>
+<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+<wp:extent cx="2510000" cy="1360000"/>
+<wp:docPr id="0" name="Logo"/>
+<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<pic:nvPicPr><pic:cNvPr id="0" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr>
+<pic:blipFill><a:blip r:embed="logoImg"/></pic:blipFill>
+<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2510000" cy="1360000"/></a:xfrm>
+<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>
+</pic:pic>
+</a:graphicData>
+</a:graphic>
+</wp:inline>
+</w:drawing>
+</w:r>
+</w:p>`;
+    }
     
     // Title
     docContent += createParagraph('RAPPORT DE PRÉSENCE', true, 32);

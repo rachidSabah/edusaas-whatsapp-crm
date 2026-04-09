@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     // Validate organization access
     if (!organizationId || organizationId !== user.organizationId) {
       return NextResponse.json(
-        { error: 'Accès non autorisé', message: 'Vous n\\'avez pas accès à cette organisation.' },
+        { error: 'Accès non autorisé', message: 'Vous n\'avez pas accès à cette organisation.' },
         { status: 403 }
       );
     }

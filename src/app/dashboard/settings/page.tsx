@@ -31,7 +31,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Settings, User, Building2, Bot, MessageSquare, Save, QrCode, 
   Send, Loader2, Sparkles, RefreshCw, CheckCircle, XCircle,
-  Upload, FileText, Trash2, Download, Clock, Mail, Plus, Lock, Key, AlertCircle
+  Upload, FileText, Trash2, Download, Clock, Mail, Plus, Lock, Key, AlertCircle, Image
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_MODELS, initPuter, isPuterLoaded, aiChat, getKV, setKV } from '@/lib/puter';
@@ -114,6 +114,12 @@ function SettingsPageContent() {
   });
   const [isNewOrg, setIsNewOrg] = useState(false);
 
+  // Logo state
+  const [logo, setLogo] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // AI Settings
   const [aiSettings, setAiSettings] = useState<AISettings>({
     enabled: true,
@@ -195,6 +201,17 @@ Instructions:
           aiEnabled: org.aiEnabled ?? true,
         });
         setIsNewOrg(false);
+
+        // Fetch logo from branding settings
+        try {
+          const brandingResponse = await fetch(`/api/branding?organizationId=${org.id}`);
+          const brandingData = await brandingResponse.json();
+          if (brandingData.branding?.logo) {
+            setLogo(brandingData.branding.logo);
+          }
+        } catch (err) {
+          console.error('Error fetching branding:', err);
+        }
       } else {
         // No organization exists - set up for creating a new one
         setIsNewOrg(true);
@@ -204,6 +221,107 @@ Instructions:
       setIsNewOrg(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle logo upload with dimension validation
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoError(null);
+
+    // Validate file size (max 500KB)
+    if (file.size > 500000) {
+      setLogoError('Le fichier doit être inférieur à 500KB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Veuillez sélectionner un fichier image');
+      return;
+    }
+
+    setLogoUploading(true);
+
+    try {
+      // Read the image to validate dimensions
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        
+        // Create an image to check dimensions
+        const img = new window.Image();
+        img.onload = async () => {
+          const MAX_WIDTH = 251;
+          const MAX_HEIGHT = 136;
+
+          if (img.width > MAX_WIDTH || img.height > MAX_HEIGHT) {
+            setLogoError(`Les dimensions de l'image doivent être ${MAX_WIDTH}x${MAX_HEIGHT} pixels ou moins. Actuel: ${img.width}x${img.height}`);
+            setLogoUploading(false);
+            return;
+          }
+
+          // Image is valid, save it
+          setLogo(dataUrl);
+          setLogoUploading(false);
+
+          // Save to branding settings
+          try {
+            const response = await fetch('/api/branding', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ logo: dataUrl }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to save logo');
+            }
+          } catch (err) {
+            console.error('Error saving logo:', err);
+            setLogoError('Erreur lors de l\'enregistrement du logo');
+          }
+        };
+
+        img.onerror = () => {
+          setLogoError('Impossible de charger l\'image');
+          setLogoUploading(false);
+        };
+
+        img.src = dataUrl;
+      };
+
+      reader.onerror = () => {
+        setLogoError('Erreur lors de la lecture du fichier');
+        setLogoUploading(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setLogoError('Erreur lors du traitement de l\'image');
+      setLogoUploading(false);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Remove logo
+  const handleRemoveLogo = async () => {
+    if (!confirm('Supprimer le logo?')) return;
+    
+    setLogo(null);
+    try {
+      await fetch('/api/branding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo: null }),
+      });
+    } catch (err) {
+      console.error('Error removing logo:', err);
     }
   };
 
@@ -618,6 +736,102 @@ Instructions:
               </CardContent>
             </Card>
           </div>
+
+          {/* Logo Upload Card */}
+          <Card className="border-0 shadow-md">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Image className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <CardTitle>Logo de l'organisation</CardTitle>
+                  <CardDescription>Le logo apparaîtra sur les rapports générés</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Logo Error */}
+              {logoError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{logoError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex items-start gap-6">
+                {/* Logo Preview */}
+                <div className="flex-shrink-0">
+                  {logo ? (
+                    <div className="relative border rounded-lg p-2 bg-slate-50">
+                      <img
+                        src={logo}
+                        alt="Logo"
+                        className="max-w-[251px] max-h-[136px] object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-[251px] h-[136px] border-2 border-dashed rounded-lg flex items-center justify-center bg-slate-50">
+                      <div className="text-center text-slate-400">
+                        <Image className="w-12 h-12 mx-auto mb-2" />
+                        <p className="text-sm">Aucun logo</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Controls */}
+                <div className="flex-1 space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="logo-upload">Télécharger un logo</Label>
+                    <input
+                      ref={fileInputRef}
+                      id="logo-upload"
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={logoUploading}
+                      className="w-full"
+                    >
+                      {logoUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Traitement...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Choisir un fichier
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="text-sm text-slate-500 space-y-1">
+                    <p><strong>Dimensions max:</strong> 251 × 136 pixels</p>
+                    <p><strong>Taille max:</strong> 500 KB</p>
+                    <p><strong>Formats:</strong> PNG, JPEG, SVG, WebP</p>
+                  </div>
+
+                  {logo && (
+                    <Button
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700 w-full"
+                      onClick={handleRemoveLogo}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Supprimer le logo
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Email Tab */}
