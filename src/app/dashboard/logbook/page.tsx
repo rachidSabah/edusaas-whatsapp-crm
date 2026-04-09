@@ -846,6 +846,9 @@ export default function LogBookPage() {
               <Eye className="w-5 h-5 text-green-600" />
               Détails de l'entrée
             </DialogTitle>
+            <DialogDescription>
+              Consultez les détails complets de cette entrée du cahier de texte
+            </DialogDescription>
           </DialogHeader>
 
           {viewingLog && (
