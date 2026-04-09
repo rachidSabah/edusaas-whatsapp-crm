@@ -47,7 +47,7 @@ export async function processIncomingMessage(data: {
 
   if (contactResult.length === 0) {
     // Create new contact
-    contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    contactId = `contact_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.execute(
       `INSERT INTO contacts (id, organizationId, phone, tags) VALUES (?, ?, ?, 'PROSPECT')`,
       [contactId, organizationId, from]
@@ -66,7 +66,7 @@ export async function processIncomingMessage(data: {
 
   if (convResult.length === 0) {
     // Create new conversation
-    conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.execute(
       `INSERT INTO conversations (id, organizationId, contactId, status, category) VALUES (?, ?, ?, 'active', 'general')`,
       [conversationId, organizationId, contactId]
@@ -76,7 +76,7 @@ export async function processIncomingMessage(data: {
   }
 
   // Store incoming message
-  const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   await db.execute(
     `INSERT INTO messages (id, organizationId, conversationId, content, mediaUrl, mediaType, direction, status, whatsappId)
           VALUES (?, ?, ?, ?, ?, ?, 'inbound', 'delivered', ?)`,
@@ -141,7 +141,7 @@ export async function processIncomingMessage(data: {
 
   // Store outgoing message
   if (aiResponse.text) {
-    const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.execute(
       `INSERT INTO messages (id, organizationId, conversationId, content, direction, status, isAiGenerated)
             VALUES (?, ?, ?, ?, 'outbound', 'sent', 1)`,
@@ -191,7 +191,7 @@ export async function sendWhatsAppMessage(data: {
       let conversationId: string;
 
       if (convResult.length === 0) {
-        conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         await db.execute(
           `INSERT INTO conversations (id, organizationId, contactId, status) VALUES (?, ?, ?, 'active')`,
           [conversationId, data.organizationId, contactId]
@@ -201,7 +201,7 @@ export async function sendWhatsAppMessage(data: {
       }
 
       // Store outgoing message
-      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `INSERT INTO messages (id, organizationId, conversationId, content, direction, status) VALUES (?, ?, ?, ?, 'outbound', 'sent')`,
         [msgId, data.organizationId, conversationId, data.message]

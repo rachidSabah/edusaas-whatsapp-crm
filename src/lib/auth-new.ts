@@ -146,7 +146,7 @@ export async function createUser(data: {
   organizationId?: string 
 }): Promise<AuthUser> {
   const hashedPassword = await hashPassword(data.password);
-  const id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const id = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
   await db.execute({
     sql: 'INSERT INTO users (id, email, password, name, role, organizationId, isActive) VALUES (?, ?, ?, ?, ?, ?, 1)',

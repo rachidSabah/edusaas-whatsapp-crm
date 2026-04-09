@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `student_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const studentIdVal = customStudentId || `STD${Date.now()}`;
 
     // Simple INSERT — if it throws, we catch below. If it succeeds, the data is in the DB.

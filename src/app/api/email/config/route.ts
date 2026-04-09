@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const newId = `ec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newId = `ec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // If this is the first config or marked as default, unset others
     if (isDefault) {

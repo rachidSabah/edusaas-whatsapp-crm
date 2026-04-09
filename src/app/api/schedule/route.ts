@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La date est requise' }, { status: 400 });
     }
 
-    const id = `sched_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `sched_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     await db.execute(
       `INSERT INTO schedule (id, organizationId, date, startTime, endTime, courseId, teacherId, classroomId, groupId, notes)

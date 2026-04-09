@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
       if (systemTemplate.length > 0) {
         const tpl = systemTemplate[0];
-        const id = `tpl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const id = `tpl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         await db.execute(
           `INSERT INTO templates (id, organizationId, name, category, subject, content, variables, isSystem, triggerAction, signature, isActive)
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = `tpl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `tpl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     await db.execute(
       `INSERT INTO templates (id, organizationId, name, category, subject, content, variables, isSystem, triggerAction, signature, isActive)
@@ -197,7 +197,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      const newId = `tpl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newId = `tpl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       
       await db.execute(
         `INSERT INTO templates (id, organizationId, name, category, subject, content, variables, isSystem, triggerAction, signature, isActive)

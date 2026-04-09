@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `grp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     console.log(`[${requestId}] Generated group ID: ${id}`);
 
     // Insert group

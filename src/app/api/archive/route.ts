@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         const attendanceSummary = JSON.stringify(attendance[0] || { present: 0, absent: 0, late: 0 });
 
         // Create archive record
-        const archiveId = `archive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const archiveId = `archive_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
         await db.execute(
           `INSERT INTO graduated_students_archive 

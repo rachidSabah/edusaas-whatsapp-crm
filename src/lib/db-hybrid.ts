@@ -47,39 +47,32 @@ export function getDbContext(): DbContext {
   return {
     query: async <T = Record<string, unknown>>(sql: string, args: unknown[] = []): Promise<T[]> => {
       const db = getD1Database();
-      console.log(`[D1 Query] ${sql.substring(0, 100)}...`);
-      console.log(`[D1 Args]`, args);
       
       try {
         const stmt = db.prepare(sql);
         const result = await stmt.bind(...args).all<T>();
-        console.log(`[D1 Result] ${result.results?.length || 0} rows`);
         return result.results || [];
       } catch (error) {
-        console.error('[D1 Query Error]:', error);
+        console.error('[D1 Query Error]:', error instanceof Error ? error.message : 'Unknown error');
         throw error;
       }
     },
     
     execute: async (sql: string, args: unknown[] = []): Promise<DbResult> => {
       const db = getD1Database();
-      console.log(`[D1 Execute] ${sql.substring(0, 100)}...`);
-      console.log(`[D1 Args]`, args);
       
       try {
         const stmt = db.prepare(sql);
         const result = await stmt.bind(...args).run();
-        console.log(`[D1 Execute Result] Success: ${result.success}, Changes: ${result.meta?.changes || 0}`);
         return result;
       } catch (error) {
-        console.error('[D1 Execute Error]:', error);
+        console.error('[D1 Execute Error]:', error instanceof Error ? error.message : 'Unknown error');
         throw error;
       }
     },
     
     batch: async (statements: { sql: string; args?: unknown[] }[]): Promise<DbResult[]> => {
       const db = getD1Database();
-      console.log(`[D1 Batch] Executing ${statements.length} statements`);
       
       try {
         const stmts = statements.map(s => {
@@ -87,10 +80,9 @@ export function getDbContext(): DbContext {
           return s.args && s.args.length > 0 ? stmt.bind(...s.args) : stmt;
         });
         const results = await db.batch(stmts);
-        console.log(`[D1 Batch] Completed ${results.length} statements`);
         return results;
       } catch (error) {
-        console.error('[D1 Batch Error]:', error);
+        console.error('[D1 Batch Error]:', error instanceof Error ? error.message : 'Unknown error');
         throw error;
       }
     },

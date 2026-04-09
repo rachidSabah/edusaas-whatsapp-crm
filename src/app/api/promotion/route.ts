@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         );
 
         // Record promotion history
-        const historyId = `promo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const historyId = `promo_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         await db.execute(
           `INSERT INTO promotion_history 
            (id, organizationId, studentId, fromYear, toYear, fromStatus, toStatus, promotedById, academicYear, notes)

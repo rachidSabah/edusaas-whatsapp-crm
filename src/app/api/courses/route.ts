@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Un cours avec ce nom existe déjà' }, { status: 400 });
     }
 
-    const id = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `course_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     console.log(`[${requestId}] Generated course ID: ${id}`);
 
     // Insert course
@@ -234,6 +234,16 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
+    }
+
+    // Verify ownership before deletion
+    const check = await db.query<{ id: string }>(
+      `SELECT id FROM courses WHERE id = ? AND organizationId = ?`,
+      [id, user.organizationId]
+    );
+
+    if (check.length === 0) {
+      return NextResponse.json({ error: 'Cours non trouvé' }, { status: 404 });
     }
 
     await db.execute(`UPDATE courses SET isActive = 0 WHERE id = ?`, [id]);

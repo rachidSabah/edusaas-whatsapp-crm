@@ -63,7 +63,7 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
 async function autoSetupSuperAdmin(userId: string, email: string): Promise<string> {
   console.log(`[autoSetupSuperAdmin] Setting up organization for SUPER_ADMIN: ${userId}`);
   
-  const orgId = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const orgId = `org_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const now = new Date().toISOString();
   
   const db = getDbContext();

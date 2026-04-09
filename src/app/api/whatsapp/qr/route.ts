@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Generate session token if not exists
     let sessionToken = account.sessionToken;
     if (!sessionToken) {
-      sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `UPDATE whatsapp_accounts SET sessionToken = ? WHERE id = ?`,
         [sessionToken, accountId]

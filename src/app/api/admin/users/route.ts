@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No organization specified' }, { status: 400 });
     }
 
-    const id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const hashedPassword = await hashPassword(password || 'ChangeMe123!');
     const now = new Date().toISOString();
 

@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
 
     await db.execute(

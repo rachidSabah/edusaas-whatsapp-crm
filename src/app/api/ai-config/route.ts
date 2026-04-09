@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     const configId = existing.length > 0 
       ? existing[0].id 
-      : `ai_config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      : `ai_config_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const systemInstructions = config.systemInstructions || DEFAULT_AI_CONFIG.systemInstructions;
     const responseTone = config.responseTone || DEFAULT_AI_CONFIG.responseTone;

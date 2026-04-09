@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         ];
 
         for (const folder of defaultFolders) {
-          const id = `ef_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const id = `ef_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
           await db.execute(
             `INSERT INTO email_folders (id, organizationId, userId, name, type, orderIndex, createdAt)
              VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
       [user.organizationId, user.id]
     );
 
-    const id = `eml_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `eml_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // Create email record
     await db.execute(

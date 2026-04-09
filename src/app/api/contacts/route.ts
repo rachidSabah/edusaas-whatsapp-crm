@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `contact_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const tagsStr = tags ? (Array.isArray(tags) ? tags.join(',') : tags) : 'PROSPECT';
 
     await db.execute(

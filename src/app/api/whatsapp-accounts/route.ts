@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ce numéro est déjà enregistré' }, { status: 400 });
     }
 
-    const id = `wa_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `wa_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const deviceId = `device_${Date.now()}`;
 
     await db.execute(

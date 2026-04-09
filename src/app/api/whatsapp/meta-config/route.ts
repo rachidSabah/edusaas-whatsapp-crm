@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     const id = existing.length > 0 
       ? existing[0].id 
-      : `wa_meta_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      : `wa_meta_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     if (existing.length > 0) {
       // Update existing configuration

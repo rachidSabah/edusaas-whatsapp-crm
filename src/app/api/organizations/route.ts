@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Organization with this slug already exists' }, { status: 400 });
     }
 
-    const id = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `org_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
 
     await db.execute(

@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     const createdSchedules: ScheduleBatch[] = [];
     
     for (const date of dates) {
-      const id = `sched_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `sched_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       
       await db.execute(
         `INSERT INTO schedule (id, organizationId, date, timeSlot, courseId, teacherId, classroomId, groupId, notes, isActive)

@@ -192,7 +192,7 @@ export async function logActivity(data: {
   entityId?: string;
   details?: Record<string, any>;
 }): Promise<void> {
-  const id = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const id = `activity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   await db.execute({
     sql: `INSERT INTO activities (id, organizationId, userId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [

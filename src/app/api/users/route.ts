@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     // Non-super admin cannot create super admin
     const targetRole = user.role === 'SUPER_ADMIN' ? role : (role === 'SUPER_ADMIN' ? 'CHAT_OPERATOR' : role);
 
-    const id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const hashedPassword = await hashPassword(password);
     const now = new Date().toISOString();
 

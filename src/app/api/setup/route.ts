@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create default organization for SUPER_ADMIN
-    const orgId = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const orgId = `org_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     await db.execute(
       `INSERT INTO organizations (id, name, slug, email, phone, address, city, country, plan, locale, isActive, aiEnabled, aiDailyLimit, aiDailyUsed)

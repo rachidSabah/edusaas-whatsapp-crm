@@ -220,7 +220,7 @@ export async function processDocumentForKnowledge(
     const items: KnowledgeBaseItem[] = [];
 
     for (const item of extractedItems) {
-      const id = `kb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `kb_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       await db.execute(
         `INSERT INTO knowledge_base (id, organizationId, question, answer, category, source, sourceFile)

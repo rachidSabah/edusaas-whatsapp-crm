@@ -25,14 +25,16 @@ export interface AuthUser {
 }
 
 const COOKIE_NAME = 'edusaas_token';
-const PASSWORD_SALT = 'edusaas-password-salt-2024';
-const JWT_SECRET = 'edusaas-production-jwt-secret-hybrid-2024-super-secure';
+
+// Get secrets from environment or use secure defaults for development
+const getPasswordSalt = () => process.env.PASSWORD_SALT || 'edusaas-dev-salt-change-in-production';
+const getJwtSecret = () => process.env.JWT_SECRET || 'edusaas-dev-jwt-secret-change-in-production';
 
 /**
  * Get JWT secret as Uint8Array
  */
 function getJwtSecretBytes(): Uint8Array {
-  return new TextEncoder().encode(JWT_SECRET);
+  return new TextEncoder().encode(getJwtSecret());
 }
 
 /**
@@ -62,9 +64,7 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
  * Auto-setup organization for SUPER_ADMIN without organization
  */
 async function autoSetupSuperAdmin(userId: string, email: string): Promise<string> {
-  console.log(`[autoSetupSuperAdmin] Setting up organization for SUPER_ADMIN: ${userId}`);
-  
-  const orgId = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const orgId = `org_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   const now = new Date().toISOString();
   
   const db = getDbContext();
@@ -82,7 +82,6 @@ async function autoSetupSuperAdmin(userId: string, email: string): Promise<strin
     orgId, userId
   );
   
-  console.log(`[autoSetupSuperAdmin] Created organization ${orgId} for user ${userId}`);
   return orgId;
 }
 
@@ -125,7 +124,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     // Auto-setup for SUPER_ADMIN without organization
     if (user.role === 'SUPER_ADMIN' && !user.organizationId) {
-      console.log(`[getCurrentUser] SUPER_ADMIN without organization, auto-setting up...`);
       const orgId = await autoSetupSuperAdmin(user.id, user.email);
       user.organizationId = orgId;
     }
@@ -149,7 +147,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password + PASSWORD_SALT);
+  const data = encoder.encode(password + getPasswordSalt());
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -166,17 +164,14 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     return newHash === hash;
   }
   
-  // For bcrypt hashes from legacy users - direct comparison fallback
+  // For bcrypt hashes from legacy users - use proper verification
   if (hash.startsWith('$2')) {
-    // Try direct password match for admin account
-    if (password === 'Santafee@@@@@1972') {
-      return true;
-    }
+    // Legacy bcrypt hash - user should reset password
     return false;
   }
   
-  // Plain text (for testing)
-  return password === hash;
+  // Unknown hash format
+  return false;
 }
 
 /**
@@ -230,8 +225,6 @@ export async function authenticateUser(
   email: string, 
   password: string
 ): Promise<{ user: AuthUser; token: string } | null> {
-  console.log(`Authenticating user: ${email}`);
-  
   // Query user from database (D1)
   const user = await getOne<{
     id: string;
@@ -247,39 +240,26 @@ export async function authenticateUser(
     [email.toLowerCase()]
   );
 
-  console.log(`Found user: ${user ? user.email : 'none'}`);
-
   if (!user) {
-    console.log(`No user found for email: ${email}`);
     return null;
   }
   
   if (user.isActive !== 1) {
-    console.log(`User ${email} is not active`);
     return null;
   }
 
-  // Special handling for SUPER_ADMIN with known password
-  let isValidPassword = false;
-  if (user.role === 'SUPER_ADMIN') {
-    isValidPassword = password === 'Santafee@@@@@1972';
-    console.log(`SUPER_ADMIN password check: ${isValidPassword ? 'Valid' : 'Invalid'}`);
-  } else {
-    isValidPassword = await verifyPassword(password, user.password);
-    console.log(`Regular user password check: ${isValidPassword ? 'Valid' : 'Invalid'}`);
-  }
+  // Verify password using hash comparison
+  const isValidPassword = await verifyPassword(password, user.password);
 
   if (!isValidPassword) {
-    console.log(`Invalid password for user: ${email}`);
     return null;
   }
 
   // Update last login
   try {
     await execute(`UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
-    console.log(`Updated last login for user: ${email}`);
-  } catch (updateError) {
-    console.warn(`Could not update last login for user ${email}:`, updateError);
+  } catch {
+    // Non-critical error, continue
   }
 
   const payload: JWTPayload = {
@@ -291,7 +271,6 @@ export async function authenticateUser(
   };
 
   const token = await generateToken(payload);
-  console.log(`Generated token for user: ${email}`);
 
   return {
     user: {

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     let itemsCreated = 0;
 
     for (const item of extractedItems) {
-      const id = `kb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `kb_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       try {
         await db.execute(

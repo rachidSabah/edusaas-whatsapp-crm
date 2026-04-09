@@ -286,7 +286,7 @@ export class SMTPProvider implements EmailProviderInterface {
 
       // For Edge runtime, we simulate successful sending
       // In production, integrate with an HTTP-to-SMTP relay service
-      const messageId = `smtp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = `smtp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       console.log('SMTP Send:', {
         host: config.smtpHost,

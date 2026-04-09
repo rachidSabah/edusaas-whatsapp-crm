@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const { name, email, phone, address, city, country, userId } = body;
     
     // Create organization
-    const id = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `org_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') || `org-${Date.now()}`;
     const now = new Date().toISOString();
     

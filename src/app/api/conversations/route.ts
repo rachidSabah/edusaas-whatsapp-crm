@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ conversation: existingConv[0] });
       }
 
-      const id = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       await db.execute(
         `INSERT INTO conversations (id, organizationId, contactId, category, aiEnabled, assignedToId, status, priority)

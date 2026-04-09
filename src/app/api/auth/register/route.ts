@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      organizationId = `org_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      organizationId = `org_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await tursoQuery(
         dbUrl,
         dbToken,
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const hashedPassword = await hashPassword(password);
 
     await tursoQuery(

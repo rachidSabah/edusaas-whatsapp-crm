@@ -65,13 +65,8 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      // Special handling for SUPER_ADMIN
-      let isValidPassword = false;
-      if (user.role === 'SUPER_ADMIN' && user.email === 'admin@edusaas.ma') {
-        isValidPassword = currentPassword === 'Santafee@@@@@1972';
-      } else {
-        isValidPassword = await verifyPassword(currentPassword, users[0].password);
-      }
+      // Verify current password
+      const isValidPassword = await verifyPassword(currentPassword, users[0].password);
 
       if (!isValidPassword) {
         return NextResponse.json(

@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       const isPrimary = count[0]?.count === 0 ? 1 : 0;
 
       // Insert new number
-      const id = `meta_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `meta_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `INSERT INTO whatsapp_meta_numbers 
          (id, organizationId, phoneNumberId, displayPhoneNumber, accessToken, isActive, isPrimary)

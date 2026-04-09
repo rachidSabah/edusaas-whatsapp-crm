@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `task_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
 
     await db.execute(

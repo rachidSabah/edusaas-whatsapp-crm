@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser, setAuthCookie } from '@/lib/auth-hybrid';
 
 export async function POST(request: NextRequest) {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   
   try {
     console.log(`[${requestId}] === LOGIN ATTEMPT (Hybrid) ===`);

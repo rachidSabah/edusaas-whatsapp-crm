@@ -372,7 +372,7 @@ export async function PUT(request: NextRequest) {
       );
     } else {
       // Create new branding
-      const id = `branding_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `branding_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `INSERT INTO branding_settings (
           id, organizationId, logo, logoWidth, appName, tagline, primaryColor, secondaryColor, accentColor,

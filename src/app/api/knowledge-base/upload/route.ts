@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
       totalExtracted = qaPairs.length;
 
       for (const qa of qaPairs) {
-        const id = `kb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const id = `kb_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         await db.execute(
           `INSERT INTO knowledge_base (id, organizationId, question, answer, category, keywords, priority, isActive)

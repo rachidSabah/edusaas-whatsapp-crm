@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
       contactId = contacts[0].id;
     } else {
       // Create new contact
-      contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      contactId = `contact_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `INSERT INTO contacts (id, organizationId, phone, tags, createdAt, updatedAt) 
          VALUES (?, ?, ?, 'PARENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
     if (conversations.length > 0) {
       conversationId = conversations[0].id;
     } else {
-      conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       await db.execute(
         `INSERT INTO conversations (id, organizationId, contactId, status, createdAt, updatedAt) 
          VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store outgoing message
-    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     await db.execute(
       `INSERT INTO messages (id, organizationId, conversationId, content, direction, status, createdAt) 
        VALUES (?, ?, ?, ?, 'outbound', ?, CURRENT_TIMESTAMP)`,

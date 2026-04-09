@@ -217,7 +217,7 @@ export async function createBackupRecord(
   recordCount: number
 ): Promise<string> {
   const db = getDbContext();
-  const id = `backup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const id = `backup_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   await db.execute(
     `INSERT INTO backup_history (id, organizationId, type, size, recordCount, status)
