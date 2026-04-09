@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbContext } from '@/lib/db-hybrid';
 import { DEFAULT_AI_CONFIG, type AIConfig } from '@/app/api/ai-config/constants';
+import { requireAuth } from '@/lib/auth-hybrid';
 
 interface KnowledgeEntry {
   id: string;
@@ -185,12 +186,23 @@ async function generateAIResponse(
 // Main chat endpoint
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await requireAuth();
+    
     const body: ChatRequest = await request.json();
     const { message, organizationId, conversationId, history } = body;
 
-    if (!message || !organizationId) {
+    // Validate organization access
+    if (!organizationId || organizationId !== user.organizationId) {
       return NextResponse.json(
-        { error: 'Message et organisation requis', message: 'Veuillez fournir un message et un identifiant d\'organisation.' },
+        { error: 'Accès non autorisé', message: 'Vous n\'avez pas accès à cette organisation.' },
+        { status: 403 }
+      );
+    }
+
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Message requis', message: 'Veuillez fournir un message.' },
         { status: 400 }
       );
     }
@@ -270,14 +282,18 @@ export async function POST(request: NextRequest) {
 // Get conversation history
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await requireAuth();
+    
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get('organizationId');
     const conversationId = searchParams.get('conversationId');
 
-    if (!organizationId) {
+    // Validate organization access
+    if (!organizationId || organizationId !== user.organizationId) {
       return NextResponse.json(
-        { error: 'Identifiant organisation requis' },
-        { status: 400 }
+        { error: 'Accès non autorisé' },
+        { status: 403 }
       );
     }
 

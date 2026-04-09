@@ -2,10 +2,17 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { tursoQuery, tursoExecute, getDbCredentials, type CloudflareEnv } from '@/lib/turso-http';
+import { requireAuth } from '@/lib/auth-hybrid';
 
-// No auth required - for debugging only
+// SUPER_ADMIN only - for debugging
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate and verify SUPER_ADMIN role
+    const user = await requireAuth();
+    
+    if (user.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Accès refusé - Super Admin uniquement' }, { status: 403 });
+    }
     // Get Cloudflare env with fallback support
     let env: CloudflareEnv | null = null;
     try {

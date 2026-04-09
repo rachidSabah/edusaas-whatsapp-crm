@@ -2,6 +2,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbContext } from '@/lib/db-hybrid';
+import { requireAuth } from '@/lib/auth-hybrid';
 
 interface Student {
   id: string;
@@ -182,13 +183,17 @@ async function generateAttendanceResponse(
 // Main handler
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await requireAuth();
+    
     const body: AttendanceRequest = await request.json();
     const { action, organizationId, studentName, studentId, status, date, notes, phone } = body;
 
-    if (!organizationId) {
+    // Validate organization access
+    if (!organizationId || organizationId !== user.organizationId) {
       return NextResponse.json(
-        { error: 'Identifiant organisation requis', message: 'Veuillez fournir un identifiant d\'organisation.' },
-        { status: 400 }
+        { error: 'Accès non autorisé', message: 'Vous n\\'avez pas accès à cette organisation.' },
+        { status: 403 }
       );
     }
 
@@ -336,15 +341,19 @@ export async function POST(request: NextRequest) {
 // Get attendance for a student
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const user = await requireAuth();
+    
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get('organizationId');
     const studentId = searchParams.get('studentId');
     const date = searchParams.get('date');
 
-    if (!organizationId) {
+    // Validate organization access
+    if (!organizationId || organizationId !== user.organizationId) {
       return NextResponse.json(
-        { error: 'Identifiant organisation requis' },
-        { status: 400 }
+        { error: 'Accès non autorisé' },
+        { status: 403 }
       );
     }
 

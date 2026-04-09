@@ -83,6 +83,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name, email and role required' }, { status: 400 });
     }
 
+    if (!password) {
+      return NextResponse.json({ error: 'Password is required for new users' }, { status: 400 });
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+    }
+
     // Check if email exists
     const existing = await db.query<{ id: string }>(
       `SELECT id FROM users WHERE email = ?`,
@@ -103,7 +111,7 @@ export async function POST(request: NextRequest) {
     }
 
     const id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const hashedPassword = await hashPassword(password || 'ChangeMe123!');
+    const hashedPassword = await hashPassword(password);
     const now = new Date().toISOString();
 
     await db.execute(
