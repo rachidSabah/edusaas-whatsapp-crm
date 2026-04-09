@@ -49,6 +49,7 @@ import {
   Webhook,
   Phone,
   Palette,
+  BookMarked,
 } from 'lucide-react';
 
 const menuItems = [
@@ -63,6 +64,7 @@ const menuItems = [
   { href: '/dashboard/classrooms', label: 'Salles', icon: MapPin },
   { href: '/dashboard/calendar', label: 'Calendrier', icon: Calendar },
   { href: '/dashboard/attendance', label: 'Présences', icon: CalendarDays },
+  { href: '/dashboard/logbook', label: 'Cahier de Texte', icon: BookMarked },
   { href: '/dashboard/academic-years', label: 'Années académiques', icon: Presentation },
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
   { href: '/dashboard/messaging', label: 'Envoi Messages', icon: Send },
