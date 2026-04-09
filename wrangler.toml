@@ -4,7 +4,6 @@
 name = "edusaas-whatsapp-crm"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
-account_id = "8b0712b4eeadbc197e9363f2a0d8e700"
 
 # Build output directory - required for @cloudflare/next-on-pages
 pages_build_output_dir = ".vercel/output/static"
